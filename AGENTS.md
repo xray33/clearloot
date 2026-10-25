@@ -70,3 +70,15 @@ Files are loaded in the exact order specified in `ClearLoot.toc`. All modules sh
   - Test multi-item tabs with `/cl testmulti`.
   - Test 40-man raid scrolling and pass/pending filters with `/cl testraid`.
   - Test settings panel with `/cl config`.
+
+---
+
+## 5. Git, Pull Request, & Release Workflow
+- **Protected `main` Branch:** Direct commits and pushes to `main` are strictly forbidden.
+- **Branching Rule for AI Agents:**
+  1. Before committing any changes, always check the current branch (`git branch --show-current`).
+  2. If on `main`, create and switch to a descriptive feature or fix branch (`git checkout -b feat/<short-name>` or `git checkout -b fix/<short-name>`).
+  3. Commit changes to the feature branch and push the branch (`git push -u origin <branch-name>`) to open a Pull Request against `main`.
+- **CurseForge Release Packaging:**
+  - CurseForge is configured to package **tagged commits** using `.pkgmeta` (`package-as: ClearLoot`) and `ClearLoot.toc` (`## X-Curse-Project-ID: 1765943`, `## Version: @project-version@`).
+  - Releases are published by creating a semantic version tag (`v0.1.0`, `v0.1.1`, etc.) on `main` after a PR is merged (either via GitHub Releases UI or `git tag vX.Y.Z && git push origin vX.Y.Z`).
