@@ -7,8 +7,9 @@
 ## Notes-esES: Seguimiento en tiempo real de las tiradas de botín de grupo y banda junto a la ventana de botín.
 ## Notes-esMX: Seguimiento en tiempo real de las tiradas de botín de grupo y banda junto a la ventana de botín.
 ## Author: ClearLoot
-## Version: 0.1.0
+## Version: @project-version@
 ## IconTexture: Interface\Buttons\UI-GroupLoot-Dice-Up
+## X-Curse-Project-ID: 1765943
 ## SavedVariables: ClearLootDB
 
 Locales.lua

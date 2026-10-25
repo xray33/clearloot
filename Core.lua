@@ -3,7 +3,12 @@ local L = ns.L
 
 ClearLoot = ns
 
-ns.VERSION = "0.1.0"
+local rawVersion = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
+    or (GetAddOnMetadata and GetAddOnMetadata(addonName, "Version"))
+if not rawVersion or rawVersion:find("project%-version") then
+    rawVersion = "0.1.0-dev"
+end
+ns.VERSION = rawVersion
 
 local DEFAULT_SETTINGS = {
     enabled = true,
