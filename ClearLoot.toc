@@ -1,0 +1,21 @@
+## Interface: 11509, 11508, 11507, 20506, 20505
+## Title: Clear Loot |cff00ccff(ClearLoot)|r
+## Notes: Real-time group & raid loot roll tracker next to contested loot frames.
+## Notes-ruRU: Отслеживание бросков на добычу группы и рейда в реальном времени рядом с окном розыгрыша.
+## Notes-deDE: Echtzeit-Beutewurf-Tracker für Gruppen und Schlachtzüge neben dem Beutefenster.
+## Notes-frFR: Suivi en temps réel des jets de butin de groupe et de raid à côté de la fenêtre de butin.
+## Notes-esES: Seguimiento en tiempo real de las tiradas de botín de grupo y banda junto a la ventana de botín.
+## Notes-esMX: Seguimiento en tiempo real de las tiradas de botín de grupo y banda junto a la ventana de botín.
+## Author: ClearLoot
+## Version: 0.1.0
+## IconTexture: Interface\Buttons\UI-GroupLoot-Dice-Up
+## SavedVariables: ClearLootDB
+
+Locales.lua
+Core.lua
+RosterInspector.lua
+DataTracker.lua
+UI/RollTrackerFrame.lua
+UI/MultiItemManager.lua
+Config/Settings.lua
+Test/Simulator.lua

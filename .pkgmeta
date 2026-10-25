@@ -1,0 +1,7 @@
+package-as: ClearLoot
+
+ignore:
+  - AGENTS.md
+  - README.md
+  - assets
+  - scripts
