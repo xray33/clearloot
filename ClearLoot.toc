@@ -1,4 +1,4 @@
-## Interface: 11509, 11508, 11507, 20506, 20505
+## Interface: 16001, 16000, 11509, 11508, 11507, 20506, 20505, 50502, 50501, 50500
 ## Title: Clear Loot |cff00ccff(ClearLoot)|r
 ## Notes: Real-time group & raid loot roll tracker next to contested loot frames.
 ## Notes-ruRU: Отслеживание бросков на добычу группы и рейда в реальном времени рядом с окном розыгрыша.

@@ -1,7 +1,7 @@
 # AGENTS.md — AI Agent Context & Engineering Guide for `ClearLoot`
 
 ## 1. Project Overview
-**ClearLoot** (`Clear Loot`) is a World of Warcraft Quality-of-Life (QoL) addon targeting **World of Warcraft: Forever** (Classic+ client architecture) and **WoW Classic Era / Anniversary** (`11509` / `20506`).
+**ClearLoot** (`Clear Loot`) is a World of Warcraft Quality-of-Life (QoL) addon targeting **World of Warcraft: Forever** (`16001` / `1.60.1`) and **WoW Classic Era / Anniversary** (`11509` / `20506`).
 
 Its purpose is to display a real-time companion window alongside Blizzard's native contested loot roll frames (`GroupLootFrame1`–`GroupLootFrame4`). It shows which group/raid members have answered (`Need`, `Greed`, `Disenchant`, `Pass`, or `Rolling...`), their class and role icons, their roll numbers (`1–100`), and the **Provisional Winner** if the roll ended right now.
 

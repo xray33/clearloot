@@ -68,7 +68,7 @@ Because `Interface/AddOns/ClearLoot` is symlinked to your working tree:
 
 ```text
 clearloot/
-├── ClearLoot.toc              # Addon manifest (Interfaces: 11509 Classic Era/Forever, 20506 Anniversary)
+├── ClearLoot.toc              # Addon manifest (Interfaces: 16001 Forever, 11509 Classic Era, 20506 Anniversary, 50502 MoP)
 ├── Locales.lua                # Localization tables (enUS, ruRU, deDE, frFR, esES/esMX) + GlobalStrings
 ├── Core.lua                   # Namespace setup, SavedVariables (ClearLootDB), event bus, slash commands
 ├── RosterInspector.lua        # Party/raid scanner for class, class colors, roles, and unit tokens
