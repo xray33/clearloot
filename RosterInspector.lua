@@ -7,13 +7,13 @@ local playerCache = {}
 
 -- Normalize player name by stripping realm suffix if same realm or matching short name
 function RosterInspector:GetShortName(fullName)
-    if not fullName then return "" end
+    if not fullName or ns.IsSecretValue(fullName) or type(fullName) ~= "string" then return "" end
     local short = fullName:match("^([^%-]+)")
     return short or fullName
 end
 
 function RosterInspector:GetClassColorHex(classFile)
-    if classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile] then
+    if classFile and not ns.IsSecretValue(classFile) and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile] then
         local c = RAID_CLASS_COLORS[classFile]
         if c.colorStr then
             return c.colorStr
@@ -32,11 +32,14 @@ end
 local function CacheUnit(unit)
     if not UnitExists(unit) then return end
     local name, realm = UnitName(unit)
-    if not name or name == UNKNOWNOBJECT then return end
+    if not name or ns.IsSecretValue(name) or name == UNKNOWNOBJECT then return end
+    if ns.IsSecretValue(realm) then realm = nil end
 
     local fullName = (realm and realm ~= "") and (name .. "-" .. realm) or name
     local _, classFile = UnitClass(unit)
+    if ns.IsSecretValue(classFile) then classFile = nil end
     local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit) or "NONE"
+    if ns.IsSecretValue(role) then role = "NONE" end
 
     local entry = playerCache[name] or {}
     entry.name = name
@@ -52,11 +55,11 @@ local function CacheUnit(unit)
 end
 
 function RosterInspector:FindUnitByName(name)
-    if not name then return nil end
+    if not name or ns.IsSecretValue(name) then return nil end
     local shortName = self:GetShortName(name)
 
     local myName = UnitName("player")
-    if myName and (myName == name or myName == shortName) then
+    if myName and not ns.IsSecretValue(myName) and (myName == name or myName == shortName) then
         return "player", "SELF"
     end
 
@@ -65,7 +68,7 @@ function RosterInspector:FindUnitByName(name)
             local u = "raid" .. i
             if UnitExists(u) then
                 local uName = UnitName(u)
-                if uName == name or uName == shortName then
+                if uName and not ns.IsSecretValue(uName) and (uName == name or uName == shortName) then
                     return u, "RAID_PLAYER"
                 end
             end
@@ -75,7 +78,7 @@ function RosterInspector:FindUnitByName(name)
             local u = "party" .. i
             if UnitExists(u) then
                 local uName = UnitName(u)
-                if uName == name or uName == shortName then
+                if uName and not ns.IsSecretValue(uName) and (uName == name or uName == shortName) then
                     return u, "PARTY"
                 end
             end
@@ -140,10 +143,13 @@ function RosterInspector:GetEligibleGroupMembers()
     local function AddUnit(unit)
         if UnitExists(unit) then
             local name, realm = UnitName(unit)
-            if name and name ~= UNKNOWNOBJECT and not seen[name] then
+            if name and not ns.IsSecretValue(name) and name ~= UNKNOWNOBJECT and not seen[name] then
+                if ns.IsSecretValue(realm) then realm = nil end
                 seen[name] = true
                 local _, classFile = UnitClass(unit)
+                if ns.IsSecretValue(classFile) then classFile = nil end
                 local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit) or "NONE"
+                if ns.IsSecretValue(role) then role = "NONE" end
                 table.insert(members, {
                     name = name,
                     fullName = (realm and realm ~= "") and (name .. "-" .. realm) or name,

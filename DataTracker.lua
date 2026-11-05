@@ -338,42 +338,145 @@ function DataTracker:EvaluateSession(session)
     }
 end
 
-function DataTracker:SyncFromLootHistory()
-    if not C_LootHistory or not C_LootHistory.GetNumItems then
+local function MapModernDropRollState(state, self)
+    -- EncounterLootDropRollState: NeedMainSpec=0, NeedOffSpec=1, Transmog=2, Greed=3, NoRoll=4, Pass=5
+    if state == 0 or state == 1 then
+        return self.ROLL_TYPE_NEED
+    elseif state == 2 or state == 3 then
+        return self.ROLL_TYPE_GREED
+    elseif state == 5 then
+        return self.ROLL_TYPE_PASS
+    else
+        return self.ROLL_TYPE_PENDING
+    end
+end
+
+function DataTracker:SyncModernDropInfo(dropInfo)
+    if not dropInfo or ns.IsSecretValue(dropInfo) then return end
+    local itemLink = dropInfo.itemHyperlink
+    if not itemLink or ns.IsSecretValue(itemLink) then return end
+
+    local targetRollID = dropInfo.lootListKey
+    local session = targetRollID and rollsByID[targetRollID] or nil
+
+    -- Match to an existing active roll session by itemLink if lootListKey differs from rollID
+    if not session then
+        for i = #activeRollOrder, 1, -1 do
+            local id = activeRollOrder[i]
+            local s = rollsByID[id]
+            if s and not s.isSimulated and not s.isClosed and s.itemLink == itemLink then
+                session = s
+                targetRollID = id
+                break
+            end
+        end
+    end
+
+    local isDone = (dropInfo.winner ~= nil) or (dropInfo.allPassed == true)
+    if not session and isDone then
         return
     end
 
-    local numItems = C_LootHistory.GetNumItems() or 0
-    for itemIdx = 1, numItems do
-        local rollID, itemLink, numPlayers, isDone, winnerIdx, isMasterLoot = C_LootHistory.GetItem(itemIdx)
-        if rollID and not isMasterLoot then
-            local session = rollsByID[rollID]
-            -- Only sync rolls that started during this session or are still active
-            if session or not isDone then
-                local itemName, _, itemQuality, _, _, _, _, _, _, itemTexture = GetItemInfo(itemLink or "")
-                session = self:CreateOrUpdateRollSession(rollID, {
-                    itemLink = itemLink,
-                    itemName = itemName,
-                    itemQuality = itemQuality,
-                    itemTexture = itemTexture,
-                    isDone = isDone,
-                })
+    if not targetRollID then return end
+    local itemName, _, itemQuality, _, _, _, _, _, _, itemTexture = ns.GetItemInfo(itemLink)
+    session = self:CreateOrUpdateRollSession(targetRollID, {
+        itemLink = itemLink,
+        itemName = itemName,
+        itemQuality = itemQuality,
+        itemTexture = itemTexture,
+        isDone = isDone,
+    })
 
-                if session and numPlayers and numPlayers > 0 then
-                    for playerIdx = 1, numPlayers do
-                        local name, class, rollType, roll, isWinner, isMe = C_LootHistory.GetPlayerInfo(itemIdx, playerIdx)
-                        if name then
-                            local mappedType = self.ROLL_TYPE_PENDING
-                            if rollType == LOOT_ROLL_TYPE_NEED or rollType == 1 then
-                                mappedType = self.ROLL_TYPE_NEED
-                            elseif rollType == LOOT_ROLL_TYPE_GREED or rollType == 2 then
-                                mappedType = self.ROLL_TYPE_GREED
-                            elseif rollType == LOOT_ROLL_TYPE_DISENCHANT or rollType == 3 then
-                                mappedType = self.ROLL_TYPE_DISENCHANT
-                            elseif rollType == LOOT_ROLL_TYPE_PASS or rollType == 0 then
-                                mappedType = self.ROLL_TYPE_PASS
+    if session and type(dropInfo.rollInfos) == "table" then
+        for _, rInfo in ipairs(dropInfo.rollInfos) do
+            if rInfo and not ns.IsSecretValue(rInfo) and rInfo.playerName and not ns.IsSecretValue(rInfo.playerName) then
+                local mappedType = MapModernDropRollState(rInfo.state, self)
+                local rollVal = (rInfo.roll and not ns.IsSecretValue(rInfo.roll)) and rInfo.roll or nil
+                local pClass = (rInfo.playerClass and not ns.IsSecretValue(rInfo.playerClass)) and rInfo.playerClass or nil
+                self:SetPlayerRoll(targetRollID, rInfo.playerName, pClass, mappedType, rollVal)
+            end
+        end
+    end
+end
+
+function DataTracker:SyncFromLootHistory(encounterID, lootListKey)
+    if not C_LootHistory then
+        return
+    end
+
+    -- 1. Classic Era / Anniversary / MoP C_LootHistory API
+    if C_LootHistory.GetNumItems and C_LootHistory.GetItem then
+        local numItems = C_LootHistory.GetNumItems() or 0
+        for itemIdx = 1, numItems do
+            local rollID, itemLink, numPlayers, isDone, winnerIdx, isMasterLoot = C_LootHistory.GetItem(itemIdx)
+            if rollID and not isMasterLoot then
+                local session = rollsByID[rollID]
+                -- Only sync rolls that started during this session or are still active
+                if session or not isDone then
+                    local itemName, _, itemQuality, _, _, _, _, _, _, itemTexture = ns.GetItemInfo(itemLink or "")
+                    session = self:CreateOrUpdateRollSession(rollID, {
+                        itemLink = itemLink,
+                        itemName = itemName,
+                        itemQuality = itemQuality,
+                        itemTexture = itemTexture,
+                        isDone = isDone,
+                    })
+
+                    if session and numPlayers and numPlayers > 0 and C_LootHistory.GetPlayerInfo then
+                        for playerIdx = 1, numPlayers do
+                            local name, class, rollType, roll, isWinner, isMe = C_LootHistory.GetPlayerInfo(itemIdx, playerIdx)
+                            if name and not ns.IsSecretValue(name) then
+                                local mappedType = self.ROLL_TYPE_PENDING
+                                if rollType == LOOT_ROLL_TYPE_NEED or rollType == 1 then
+                                    mappedType = self.ROLL_TYPE_NEED
+                                elseif rollType == LOOT_ROLL_TYPE_GREED or rollType == 2 then
+                                    mappedType = self.ROLL_TYPE_GREED
+                                elseif rollType == LOOT_ROLL_TYPE_DISENCHANT or rollType == 3 then
+                                    mappedType = self.ROLL_TYPE_DISENCHANT
+                                elseif rollType == LOOT_ROLL_TYPE_PASS or rollType == 0 then
+                                    mappedType = self.ROLL_TYPE_PASS
+                                end
+                                self:SetPlayerRoll(rollID, name, class, mappedType, roll)
                             end
-                            self:SetPlayerRoll(rollID, name, class, mappedType, roll)
+                        end
+                    end
+                end
+            end
+        end
+        self:NotifyUI()
+        return
+    end
+
+    -- 2. WoW Forever (1.60.1) / Modern Encounter C_LootHistory API
+    if encounterID and lootListKey and C_LootHistory.GetSortedInfoForDrop then
+        local ok, dropInfo = pcall(C_LootHistory.GetSortedInfoForDrop, encounterID, lootListKey)
+        if ok and dropInfo then
+            self:SyncModernDropInfo(dropInfo)
+            self:NotifyUI()
+            return
+        end
+    end
+
+    if encounterID and C_LootHistory.GetSortedDropsForEncounter then
+        local ok, drops = pcall(C_LootHistory.GetSortedDropsForEncounter, encounterID)
+        if ok and type(drops) == "table" then
+            for _, dropInfo in ipairs(drops) do
+                self:SyncModernDropInfo(dropInfo)
+            end
+            self:NotifyUI()
+            return
+        end
+    end
+
+    if C_LootHistory.GetAllEncounterInfos and C_LootHistory.GetSortedDropsForEncounter then
+        local ok, encounters = pcall(C_LootHistory.GetAllEncounterInfos)
+        if ok and type(encounters) == "table" then
+            for _, enc in ipairs(encounters) do
+                if enc and enc.encounterID then
+                    local okDrops, drops = pcall(C_LootHistory.GetSortedDropsForEncounter, enc.encounterID)
+                    if okDrops and type(drops) == "table" then
+                        for _, dropInfo in ipairs(drops) do
+                            self:SyncModernDropInfo(dropInfo)
                         end
                     end
                 end
@@ -385,9 +488,12 @@ function DataTracker:SyncFromLootHistory()
 end
 
 function DataTracker:OnStartLootRoll(rollID, rollTime)
-    if not rollID then return end
-    local texture, name, count, quality, bindOnPickUp, canNeed, canGreed, canDisenchant = GetLootRollItemInfo(rollID)
-    local link = GetLootRollItemLink(rollID)
+    if not rollID or ns.IsSecretValue(rollID) then return end
+    local texture, name, count, quality
+    if type(GetLootRollItemInfo) == "function" then
+        texture, name, count, quality = GetLootRollItemInfo(rollID)
+    end
+    local link = type(GetLootRollItemLink) == "function" and GetLootRollItemLink(rollID) or nil
 
     self:CreateOrUpdateRollSession(rollID, {
         itemLink = link,
@@ -406,6 +512,7 @@ function DataTracker:OnStartLootRoll(rollID, rollTime)
 end
 
 function DataTracker:OnCancelLootRoll(rollID)
+    if not rollID or ns.IsSecretValue(rollID) then return end
     local session = rollsByID[rollID]
     if not session then return end
 
@@ -422,7 +529,7 @@ function DataTracker:OnCancelLootRoll(rollID)
 end
 
 function DataTracker:OnChatMsgLoot(msg)
-    if not msg or msg == "" then return end
+    if not msg or ns.IsSecretValue(msg) or type(msg) ~= "string" or msg == "" then return end
 
     for _, entry in ipairs(chatPatterns) do
         local c1, c2, c3 = msg:match(entry.pattern)
@@ -435,7 +542,8 @@ function DataTracker:OnChatMsgLoot(msg)
 
             local playerName = parsed.player
             if entry.isSelf then
-                playerName = UnitName("player")
+                local myName = UnitName("player")
+                playerName = (myName and not ns.IsSecretValue(myName)) and myName or nil
             end
             local itemLink = parsed.item
             local rollScore = parsed.roll and tonumber(parsed.roll) or nil
@@ -511,6 +619,15 @@ function DataTracker:Init()
 
     ns:RegisterEvent("LOOT_HISTORY_FULL_UPDATE", function()
         DataTracker:SyncFromLootHistory()
+    end)
+
+    -- WoW Forever (1.60.1) / Modern Encounter Loot History events
+    ns:RegisterEvent("LOOT_HISTORY_UPDATE_DROP", function(_, encounterID, lootListKey)
+        DataTracker:SyncFromLootHistory(encounterID, lootListKey)
+    end)
+
+    ns:RegisterEvent("LOOT_HISTORY_UPDATE_ENCOUNTER", function(_, encounterID)
+        DataTracker:SyncFromLootHistory(encounterID)
     end)
 
     ns:RegisterEvent("CHAT_MSG_LOOT", function(_, msg)

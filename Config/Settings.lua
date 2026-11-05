@@ -108,9 +108,6 @@ function SettingsModule:Init()
     anchorLabel:SetPoint("TOPLEFT", 20, y)
     anchorLabel:SetText(L.SETTINGS_ANCHOR_SIDE)
 
-    local dropdown = CreateFrame("Frame", "ClearLootAnchorDropDown", panel, "UIDropDownMenuTemplate")
-    dropdown:SetPoint("TOPLEFT", anchorLabel, "BOTTOMLEFT", -16, -4)
-
     local ANCHOR_OPTIONS = {
         { value = "RIGHT", text = L.SETTINGS_ANCHOR_RIGHT },
         { value = "LEFT",  text = L.SETTINGS_ANCHOR_LEFT },
@@ -124,36 +121,98 @@ function SettingsModule:Init()
         return L.SETTINGS_ANCHOR_RIGHT
     end
 
-    UIDropDownMenu_SetWidth(dropdown, 220)
-    UIDropDownMenu_Initialize(dropdown, function(self, level)
-        for _, opt in ipairs(ANCHOR_OPTIONS) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = opt.text
-            info.value = opt.value
-            info.checked = (ns.db.anchorSide == opt.value)
-            info.func = function()
-                ns.db.anchorSide = opt.value
-                UIDropDownMenu_SetText(dropdown, opt.text)
+    local anchorWidget
+    local UpdateAnchorDisplay
+
+    local hasLegacyDropdown = (not DoesTemplateExist or DoesTemplateExist("UIDropDownMenuTemplate"))
+        and type(UIDropDownMenu_SetWidth) == "function"
+        and type(UIDropDownMenu_Initialize) == "function"
+
+    if hasLegacyDropdown then
+        local dropdown = CreateFrame("Frame", "ClearLootAnchorDropDown", panel, "UIDropDownMenuTemplate")
+        dropdown:SetPoint("TOPLEFT", anchorLabel, "BOTTOMLEFT", -16, -4)
+
+        UpdateAnchorDisplay = function(val)
+            UIDropDownMenu_SetText(dropdown, GetAnchorText(val))
+        end
+
+        UIDropDownMenu_SetWidth(dropdown, 220)
+        UIDropDownMenu_Initialize(dropdown, function(self, level)
+            for _, opt in ipairs(ANCHOR_OPTIONS) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = opt.text
+                info.value = opt.value
+                info.checked = (ns.db.anchorSide == opt.value)
+                info.func = function()
+                    ns.db.anchorSide = opt.value
+                    UpdateAnchorDisplay(opt.value)
+                    if ns.MultiItemManager then
+                        ns.MultiItemManager:UpdateAnchoring()
+                    end
+                end
+                UIDropDownMenu_AddButton(info, level)
+            end
+        end)
+
+        dropdown:SetScript("OnShow", function()
+            UpdateAnchorDisplay(ns.db.anchorSide)
+        end)
+        anchorWidget = dropdown
+    else
+        local anchorBtn = CreateFrame("Button", "ClearLootAnchorButton", panel, "UIPanelButtonTemplate")
+        anchorBtn:SetSize(240, 24)
+        anchorBtn:SetPoint("TOPLEFT", anchorLabel, "BOTTOMLEFT", 0, -6)
+
+        UpdateAnchorDisplay = function(val)
+            anchorBtn:SetText(GetAnchorText(val))
+        end
+
+        anchorBtn:SetScript("OnShow", function()
+            UpdateAnchorDisplay(ns.db.anchorSide)
+        end)
+
+        anchorBtn:SetScript("OnClick", function(self)
+            if MenuUtil and type(MenuUtil.CreateContextMenu) == "function" then
+                MenuUtil.CreateContextMenu(self, function(_, rootDescription)
+                    for _, opt in ipairs(ANCHOR_OPTIONS) do
+                        rootDescription:CreateRadio(opt.text, function()
+                            return ns.db.anchorSide == opt.value
+                        end, function()
+                            ns.db.anchorSide = opt.value
+                            UpdateAnchorDisplay(opt.value)
+                            if ns.MultiItemManager then
+                                ns.MultiItemManager:UpdateAnchoring()
+                            end
+                        end)
+                    end
+                end)
+            else
+                local nextIdx = 1
+                for idx, opt in ipairs(ANCHOR_OPTIONS) do
+                    if opt.value == ns.db.anchorSide then
+                        nextIdx = (idx % #ANCHOR_OPTIONS) + 1
+                        break
+                    end
+                end
+                local chosen = ANCHOR_OPTIONS[nextIdx]
+                ns.db.anchorSide = chosen.value
+                UpdateAnchorDisplay(chosen.value)
                 if ns.MultiItemManager then
                     ns.MultiItemManager:UpdateAnchoring()
                 end
             end
-            UIDropDownMenu_AddButton(info, level)
-        end
-    end)
-
-    dropdown:SetScript("OnShow", function(self)
-        UIDropDownMenu_SetText(self, GetAnchorText(ns.db.anchorSide))
-    end)
+        end)
+        anchorWidget = anchorBtn
+    end
 
     local resetPosBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     resetPosBtn:SetSize(160, 24)
-    resetPosBtn:SetPoint("LEFT", dropdown, "RIGHT", 0, 2)
+    resetPosBtn:SetPoint("LEFT", anchorWidget, "RIGHT", hasLegacyDropdown and 0 or 10, hasLegacyDropdown and 2 or 0)
     resetPosBtn:SetText(L.SETTINGS_RESET_POS_BTN)
     resetPosBtn:SetScript("OnClick", function()
         ns.db.freePosition = nil
         ns.db.anchorSide = "RIGHT"
-        UIDropDownMenu_SetText(dropdown, GetAnchorText("RIGHT"))
+        UpdateAnchorDisplay("RIGHT")
         if ns.MultiItemManager then
             ns.MultiItemManager:UpdateAnchoring()
         end
@@ -175,7 +234,10 @@ function SettingsModule:Init()
     testSingleBtn:SetText(L.SETTINGS_TEST_SINGLE_BTN)
     testSingleBtn:SetScript("OnClick", function()
         if ns.Simulator then
-            ns.Simulator:StartSingleTest()
+            local ok, err = pcall(ns.Simulator.StartSingleTest, ns.Simulator)
+            if not ok then
+                ns:Print("|cffff4444Simulation error:|r " .. tostring(err))
+            end
         end
     end)
 
@@ -185,7 +247,10 @@ function SettingsModule:Init()
     testMultiBtn:SetText(L.SETTINGS_TEST_MULTI_BTN)
     testMultiBtn:SetScript("OnClick", function()
         if ns.Simulator then
-            ns.Simulator:StartMultiTest()
+            local ok, err = pcall(ns.Simulator.StartMultiTest, ns.Simulator)
+            if not ok then
+                ns:Print("|cffff4444Simulation error:|r " .. tostring(err))
+            end
         end
     end)
 
@@ -195,7 +260,10 @@ function SettingsModule:Init()
     testRaidBtn:SetText(L.SETTINGS_TEST_RAID_BTN)
     testRaidBtn:SetScript("OnClick", function()
         if ns.Simulator then
-            ns.Simulator:StartRaidTest(40)
+            local ok, err = pcall(ns.Simulator.StartRaidTest, ns.Simulator, 40)
+            if not ok then
+                ns:Print("|cffff4444Simulation error:|r " .. tostring(err))
+            end
         end
     end)
 

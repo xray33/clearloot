@@ -79,7 +79,7 @@ local function ScheduleTimer(delay, callback)
 end
 
 local function ResolveMockItemInfo(mockItem, onResolved)
-    local itemName, itemLink, itemQuality, _, _, _, _, _, _, itemTexture = GetItemInfo(mockItem.itemID)
+    local itemName, itemLink, itemQuality, _, _, _, _, _, _, itemTexture = ns.GetItemInfo(mockItem.itemID)
     if itemName and itemLink then
         return {
             itemID = mockItem.itemID,
@@ -92,13 +92,15 @@ local function ResolveMockItemInfo(mockItem, onResolved)
 
     -- Request item data from server asynchronously so it updates to the client's locale as soon as cached
     if Item and Item.CreateFromItemID then
-        local itemObj = Item:CreateFromItemID(mockItem.itemID)
-        itemObj:ContinueOnItemLoad(function()
-            local loadedName, loadedLink, loadedQuality, _, _, _, _, _, _, loadedTexture = GetItemInfo(mockItem.itemID)
-            if onResolved and loadedName and loadedLink then
-                onResolved(loadedName, loadedLink, loadedTexture, loadedQuality)
-            end
-        end)
+        local ok, itemObj = pcall(Item.CreateFromItemID, Item, mockItem.itemID)
+        if ok and itemObj and itemObj.ContinueOnItemLoad then
+            itemObj:ContinueOnItemLoad(function()
+                local loadedName, loadedLink, loadedQuality, _, _, _, _, _, _, loadedTexture = ns.GetItemInfo(mockItem.itemID)
+                if onResolved and loadedName and loadedLink then
+                    onResolved(loadedName, loadedLink, loadedTexture, loadedQuality)
+                end
+            end)
+        end
     end
 
     return {
@@ -137,10 +139,12 @@ local function SpawnSimulatedItemRoll(mockItem, baseDelay, numGroupMembers)
     })
 
     -- Include the actual player + mock party/raid members up to targetSize
-    local myName = UnitName("player") or "Player"
-    local _, myClass = UnitClass("player")
+    local rawName = UnitName("player")
+    local myName = (rawName and not ns.IsSecretValue(rawName)) and rawName or "Player"
+    local _, rawClass = UnitClass("player")
+    local myClass = (rawClass and not ns.IsSecretValue(rawClass)) and rawClass or "PALADIN"
     local myRole = (UnitGroupRolesAssigned and UnitGroupRolesAssigned("player")) or "DAMAGER"
-    if myRole == "NONE" then myRole = "DAMAGER" end
+    if ns.IsSecretValue(myRole) or myRole == "NONE" then myRole = "DAMAGER" end
 
     local roster = {
         { name = myName, class = myClass or "PALADIN", role = myRole },

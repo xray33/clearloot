@@ -24,9 +24,65 @@ local DEFAULT_SETTINGS = {
 
 local eventFrame = CreateFrame("Frame", "ClearLootEventFrame")
 local registeredEvents = {}
+ns.initErrors = {}
+
+-- Cross-client API compatibility wrappers (WoW Forever 1.60.1 / 12.x vs Classic Era 1.15.x / MoP 5.5.x)
+function ns.IsSecretValue(val)
+    return type(issecretvalue) == "function" and issecretvalue(val) or false
+end
+
+function ns.GetItemInfo(itemInfo)
+    if not itemInfo then return nil end
+    local fn = (C_Item and C_Item.GetItemInfo) or _G.GetItemInfo
+    if type(fn) == "function" then
+        return fn(itemInfo)
+    end
+    return nil
+end
+
+local FALLBACK_QUALITY_COLORS = {
+    [0] = { 0.62, 0.62, 0.62 },
+    [1] = { 1.00, 1.00, 1.00 },
+    [2] = { 0.12, 1.00, 0.00 },
+    [3] = { 0.00, 0.44, 0.87 },
+    [4] = { 0.64, 0.21, 0.93 },
+    [5] = { 1.00, 0.50, 0.00 },
+}
+
+function ns.GetItemQualityColor(quality)
+    local q = tonumber(quality) or 2
+    local fn = (C_Item and C_Item.GetItemQualityColor) or _G.GetItemQualityColor
+    if type(fn) == "function" then
+        local r, g, b, hex = fn(q)
+        if r and g and b then
+            return r, g, b, hex
+        end
+    end
+    if ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q] then
+        local c = ITEM_QUALITY_COLORS[q]
+        return c.r or 1, c.g or 1, c.b or 1, c.hex
+    end
+    local fb = FALLBACK_QUALITY_COLORS[q] or FALLBACK_QUALITY_COLORS[2]
+    return fb[1], fb[2], fb[3]
+end
+
+function ns.SendWhisper(targetName)
+    if not targetName or targetName == "" then return end
+    if ChatFrameUtil and type(ChatFrameUtil.SendTell) == "function" then
+        ChatFrameUtil.SendTell(targetName)
+    elseif type(ChatFrame_SendTell) == "function" then
+        ChatFrame_SendTell(targetName)
+    elseif type(ChatFrame_OpenChat) == "function" then
+        ChatFrame_OpenChat("/w " .. targetName .. " ")
+    end
+end
 
 function ns:Print(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ccff[ClearLoot]|r " .. tostring(msg))
+    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ccff[ClearLoot]|r " .. tostring(msg))
+    else
+        print("|cff00ccff[ClearLoot]|r " .. tostring(msg))
+    end
 end
 
 function ns:InitDB()
@@ -64,8 +120,19 @@ eventFrame:SetScript("OnEvent", function(_, event, ...)
     end
 end)
 
-local function HandleSlashCommand(msg)
-    local cmd = strtrim(msg or ""):lower()
+local function TrimString(s)
+    if type(s) ~= "string" then return "" end
+    if type(strtrim) == "function" then
+        return strtrim(s)
+    end
+    return s:match("^%s*(.-)%s*$") or ""
+end
+
+local function ExecuteSlashCommand(msg)
+    if not ns.db then
+        ns:InitDB()
+    end
+    local cmd = TrimString(msg):lower()
 
     if cmd == "test" or cmd == "sim" then
         if ns.Simulator then
@@ -100,14 +167,25 @@ local function HandleSlashCommand(msg)
         end
     else
         ns:Print(L.SLASH_HELP_HEADER)
-        DEFAULT_CHAT_FRAME:AddMessage(L.SLASH_HELP_TEST)
-        DEFAULT_CHAT_FRAME:AddMessage(L.SLASH_HELP_TESTMULTI)
-        DEFAULT_CHAT_FRAME:AddMessage(L.SLASH_HELP_TESTRAID)
-        DEFAULT_CHAT_FRAME:AddMessage(L.SLASH_HELP_STOP)
-        DEFAULT_CHAT_FRAME:AddMessage(L.SLASH_HELP_SHOW)
-        DEFAULT_CHAT_FRAME:AddMessage(L.SLASH_HELP_CONFIG)
+        ns:Print(L.SLASH_HELP_TEST)
+        ns:Print(L.SLASH_HELP_TESTMULTI)
+        ns:Print(L.SLASH_HELP_TESTRAID)
+        ns:Print(L.SLASH_HELP_STOP)
+        ns:Print(L.SLASH_HELP_SHOW)
+        ns:Print(L.SLASH_HELP_CONFIG)
     end
 end
+
+local function HandleSlashCommand(msg)
+    local ok, err = pcall(ExecuteSlashCommand, msg)
+    if not ok then
+        ns:Print("|cffff4444Error running command:|r " .. tostring(err))
+    end
+end
+
+SLASH_CLEARLOOT1 = "/clearloot"
+SLASH_CLEARLOOT2 = "/cl"
+SlashCmdList["CLEARLOOT"] = HandleSlashCommand
 
 ns:RegisterEvent("ADDON_LOADED", function(_, loadedName)
     if loadedName ~= addonName then
@@ -128,12 +206,19 @@ ns:RegisterEvent("ADDON_LOADED", function(_, loadedName)
         if entry.mod and entry.mod.Init then
             local ok, err = pcall(entry.mod.Init, entry.mod)
             if not ok then
-                ns:Print("|cffff4444Error initializing " .. entry.name .. ":|r " .. tostring(err))
+                local errMsg = "|cffff4444Error initializing " .. entry.name .. ":|r " .. tostring(err)
+                table.insert(ns.initErrors, errMsg)
+                ns:Print(errMsg)
             end
         end
     end
+end)
 
-    SLASH_CLEARLOOT1 = "/clearloot"
-    SLASH_CLEARLOOT2 = "/cl"
-    SlashCmdList["CLEARLOOT"] = HandleSlashCommand
+ns:RegisterEvent("PLAYER_ENTERING_WORLD", function()
+    if ns.initErrors and #ns.initErrors > 0 then
+        for _, errMsg in ipairs(ns.initErrors) do
+            ns:Print(errMsg)
+        end
+        ns.initErrors = {}
+    end
 end)
