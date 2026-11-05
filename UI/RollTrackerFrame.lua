@@ -74,7 +74,38 @@ local function ShowPlayerContextMenu(playerData, anchorFrame)
         if ok then return end
     end
 
-    -- 3. Fallback custom native-styled dropdown menu (Whisper, Inspect, Invite, Cancel)
+    -- 3. Modern MenuUtil Context Menu (WoW Forever 1.60.1 / Mainline UI)
+    if MenuUtil and type(MenuUtil.CreateContextMenu) == "function" then
+        local ok = pcall(MenuUtil.CreateContextMenu, anchorFrame, function(_, rootDescription)
+            rootDescription:CreateTitle(ns.RosterInspector:ColorizeName(playerData.name, playerData.class))
+            rootDescription:CreateButton(_G.WHISPER or "Whisper", function()
+                ns.SendWhisper(targetName)
+            end)
+            if not InCombatLockdown() and type(InspectUnit) == "function" then
+                rootDescription:CreateButton(_G.INSPECT or "Inspect", function()
+                    InspectUnit(playerData.name)
+                end)
+            end
+            rootDescription:CreateButton(_G.INVITE or "Invite", function()
+                if C_PartyInfo and C_PartyInfo.InviteUnit then
+                    C_PartyInfo.InviteUnit(targetName)
+                elseif InviteUnit then
+                    InviteUnit(targetName)
+                end
+            end)
+            rootDescription:CreateButton(_G.CANCEL or "Cancel", function() end)
+        end)
+        if ok then return end
+    end
+
+    -- 4. Legacy UIDropDownMenuTemplate fallback (Whisper, Inspect, Invite, Cancel)
+    if type(UIDropDownMenu_Initialize) ~= "function" or type(ToggleDropDownMenu) ~= "function" then
+        return
+    end
+    if DoesTemplateExist and not DoesTemplateExist("UIDropDownMenuTemplate") then
+        return
+    end
+
     if not dropdownFrame then
         dropdownFrame = CreateFrame("Frame", "ClearLootPlayerDropDown", UIParent, "UIDropDownMenuTemplate")
     end
@@ -93,11 +124,7 @@ local function ShowPlayerContextMenu(playerData, anchorFrame)
         whisperInfo.text = _G.WHISPER or "Whisper"
         whisperInfo.notCheckable = true
         whisperInfo.func = function()
-            if ChatFrame_SendTell then
-                ChatFrame_SendTell(targetName)
-            elseif ChatFrame_OpenChat then
-                ChatFrame_OpenChat("/w " .. targetName .. " ")
-            end
+            ns.SendWhisper(targetName)
         end
         UIDropDownMenu_AddButton(whisperInfo, level)
 
@@ -180,7 +207,10 @@ local function CreateItemTab(parent, index)
 
     local badge = tab:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     badge:SetPoint("BOTTOMRIGHT", -2, 2)
-    badge:SetFont(badge:GetFont(), 9, "OUTLINE")
+    local fontFile = badge:GetFont()
+    if fontFile then
+        pcall(badge.SetFont, badge, fontFile, 9, "OUTLINE")
+    end
     tab.badge = badge
 
     tab:SetScript("OnClick", function(self)
@@ -287,12 +317,13 @@ local function CreatePlayerRow(parent, index)
             ShowPlayerContextMenu(self.playerData, self)
         elseif button == "LeftButton" and IsShiftKeyDown() then
             local target = self.playerData.fullName or self.playerData.name
-            if ChatFrame_SendTell then
-                ChatFrame_SendTell(target)
-            elseif ChatFrame_OpenChat then
-                ChatFrame_OpenChat("/w " .. target .. " ")
-            end
+            ns.SendWhisper(target)
         end
+    end)
+
+    row:EnableMouseWheel(true)
+    row:SetScript("OnMouseWheel", function(_, delta)
+        RollTrackerFrame:OnMouseWheel(delta)
     end)
 
     row:SetScript("OnEnter", function(self)
@@ -312,15 +343,44 @@ local function CreatePlayerRow(parent, index)
     return row
 end
 
+function RollTrackerFrame:OnMouseWheel(delta)
+    local frame = self.frame
+    if not frame then return end
+    local maxOffset = frame.maxScrollOffset or 0
+    if maxOffset <= 0 then return end
+
+    local newOffset = (frame.scrollOffset or 0) - (delta > 0 and 1 or -1)
+    if newOffset < 0 then newOffset = 0 end
+    if newOffset > maxOffset then newOffset = maxOffset end
+
+    if newOffset ~= frame.scrollOffset then
+        frame.scrollOffset = newOffset
+        if frame.scrollBar and frame.scrollBar:IsShown() then
+            frame.scrollBar._updating = true
+            frame.scrollBar:SetValue(newOffset)
+            frame.scrollBar._updating = false
+        end
+        self:UpdatePlayerRows()
+    end
+end
+
 function RollTrackerFrame:Init()
     local frame = CreateFrame("Frame", "ClearLootTrackerFrame", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
     frame:SetSize(WINDOW_WIDTH, HEADER_HEIGHT + (MIN_VISIBLE_ROWS * ROW_HEIGHT) + FOOTER_HEIGHT)
-    frame:SetFrameStrata("DIALOG")
+    frame:SetFrameStrata("FULLSCREEN_DIALOG")
+    frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
+    frame:EnableMouseWheel(true)
     frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton")
     ApplyClassicBackdrop(frame, 0.94)
+
+    frame.scrollOffset = 0
+    frame.maxScrollOffset = 0
+    frame:SetScript("OnMouseWheel", function(_, delta)
+        RollTrackerFrame:OnMouseWheel(delta)
+    end)
 
     frame:SetScript("OnDragStart", function(self)
         if ns.db.anchorSide == "FREE" or IsShiftKeyDown() then
@@ -355,9 +415,15 @@ function RollTrackerFrame:Init()
     end
 
     -- Close [X] button (dismisses current item only)
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+    local closeTemplate = (not DoesTemplateExist or DoesTemplateExist("UIPanelCloseButton")) and "UIPanelCloseButton" or nil
+    local closeBtn = CreateFrame("Button", nil, frame, closeTemplate)
     closeBtn:SetSize(24, 24)
     closeBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
+    if not closeTemplate then
+        local closeLabel = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        closeLabel:SetPoint("CENTER", 0, 0)
+        closeLabel:SetText("×")
+    end
     closeBtn:SetScript("OnClick", function()
         local session = DataTracker:GetCurrentRollSession()
         if session then
@@ -479,23 +545,50 @@ function RollTrackerFrame:Init()
     divider:SetPoint("BOTTOMRIGHT", colHeader, "BOTTOMRIGHT", 0, 0)
     divider:SetColorTexture(0.6, 0.5, 0.3, 0.5)
 
-    -- ScrollFrame for Player Rows
-    local scrollFrame = CreateFrame("ScrollFrame", "ClearLootRollScrollFrame", frame, "FauxScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", colHeader, "BOTTOMLEFT", 0, -2)
-    scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -12, FOOTER_HEIGHT)
-    scrollFrame:SetScript("OnVerticalScroll", function(self, offset)
-        FauxScrollFrame_OnVerticalScroll(self, offset, ROW_HEIGHT, function()
+    -- Pure-Lua Container & ScrollBar for Player Rows (no FauxScrollFrameTemplate dependency)
+    local rowContainer = CreateFrame("Frame", "ClearLootRollRowContainer", frame)
+    rowContainer:SetPoint("TOPLEFT", colHeader, "BOTTOMLEFT", 0, -2)
+    rowContainer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, FOOTER_HEIGHT)
+    frame.rowContainer = rowContainer
+
+    local scrollBar = CreateFrame("Slider", "ClearLootRollScrollBar", frame)
+    scrollBar:SetPoint("TOPRIGHT", colHeader, "BOTTOMRIGHT", -1, -4)
+    scrollBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -11, FOOTER_HEIGHT + 4)
+    scrollBar:SetWidth(8)
+    scrollBar:SetOrientation("VERTICAL")
+    scrollBar:SetValueStep(1)
+    if scrollBar.SetObeyStepOnDrag then
+        scrollBar:SetObeyStepOnDrag(true)
+    end
+    scrollBar:SetMinMaxValues(0, 0)
+    scrollBar:SetValue(0)
+
+    local sbTrack = scrollBar:CreateTexture(nil, "BACKGROUND")
+    sbTrack:SetAllPoints(scrollBar)
+    sbTrack:SetColorTexture(0, 0, 0, 0.35)
+
+    local sbThumb = scrollBar:CreateTexture(nil, "ARTWORK")
+    sbThumb:SetSize(8, 28)
+    sbThumb:SetColorTexture(0.85, 0.75, 0.45, 0.75)
+    scrollBar:SetThumbTexture(sbThumb)
+
+    scrollBar:SetScript("OnValueChanged", function(self, value)
+        if self._updating then return end
+        local rounded = math.floor((value or 0) + 0.5)
+        if rounded ~= frame.scrollOffset then
+            frame.scrollOffset = rounded
             RollTrackerFrame:UpdatePlayerRows()
-        end)
+        end
     end)
-    frame.scrollFrame = scrollFrame
+    scrollBar:Hide()
+    frame.scrollBar = scrollBar
 
     -- Create Row Pool
     frame.rows = {}
     for i = 1, MAX_VISIBLE_ROWS do
         local row = CreatePlayerRow(frame, i)
         if i == 1 then
-            row:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
+            row:SetPoint("TOPLEFT", rowContainer, "TOPLEFT", 0, 0)
         else
             row:SetPoint("TOPLEFT", frame.rows[i - 1], "BOTTOMLEFT", 0, 0)
         end
@@ -609,11 +702,31 @@ function RollTrackerFrame:UpdatePlayerRows()
     local targetHeight = HEADER_HEIGHT + (visibleRows * ROW_HEIGHT) + FOOTER_HEIGHT
     frame:SetHeight(targetHeight)
 
-    FauxScrollFrame_Update(frame.scrollFrame, numPlayers, visibleRows, ROW_HEIGHT)
-    local offset = FauxScrollFrame_GetOffset(frame.scrollFrame) or 0
+    local maxOffset = math.max(0, numPlayers - visibleRows)
+    frame.maxScrollOffset = maxOffset
+    local offset = frame.scrollOffset or 0
+    if offset > maxOffset then
+        offset = maxOffset
+        frame.scrollOffset = offset
+    elseif offset < 0 then
+        offset = 0
+        frame.scrollOffset = 0
+    end
 
     local hasScrollbar = (numPlayers > visibleRows)
-    local rowWidth = hasScrollbar and (WINDOW_WIDTH - 38) or (WINDOW_WIDTH - 20)
+    if frame.scrollBar then
+        if hasScrollbar then
+            frame.scrollBar._updating = true
+            frame.scrollBar:SetMinMaxValues(0, maxOffset)
+            frame.scrollBar:SetValue(offset)
+            frame.scrollBar._updating = false
+            frame.scrollBar:Show()
+        else
+            frame.scrollBar:Hide()
+        end
+    end
+
+    local rowWidth = hasScrollbar and (WINDOW_WIDTH - 34) or (WINDOW_WIDTH - 20)
 
     for i = 1, MAX_VISIBLE_ROWS do
         local row = frame.rows[i]
@@ -712,7 +825,7 @@ function RollTrackerFrame:Refresh(isNewRoll)
 
     -- Item Header (use plain itemName colored by quality, without hyperlink [brackets])
     frame.itemIcon:SetTexture(session.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
-    local r, g, b = GetItemQualityColor(session.itemQuality or 2)
+    local r, g, b = ns.GetItemQualityColor(session.itemQuality or 2)
     local cleanName = session.itemName
     if (not cleanName or cleanName == "") and session.itemLink then
         cleanName = session.itemLink:match("%[(.-)%]") or session.itemLink
@@ -758,4 +871,7 @@ function RollTrackerFrame:Refresh(isNewRoll)
 
     self:UpdatePlayerRows()
     frame:Show()
+    if frame.Raise then
+        frame:Raise()
+    end
 end
