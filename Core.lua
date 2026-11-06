@@ -18,6 +18,7 @@ local DEFAULT_SETTINGS = {
     keepOpenAfterMyRoll = true,
     hidePassed = false,
     hidePending = false,
+    windowOpacity = 100,  -- 20..100 (%)
     anchorSide = "RIGHT", -- "RIGHT", "LEFT", or "FREE"
     freePosition = nil,   -- { point = "CENTER", relativePoint = "CENTER", x = 220, y = 0 }
 }
@@ -25,6 +26,10 @@ local DEFAULT_SETTINGS = {
 local eventFrame = CreateFrame("Frame", "ClearLootEventFrame")
 local registeredEvents = {}
 ns.initErrors = {}
+
+local buildInterface = type(GetBuildInfo) == "function" and select(4, GetBuildInfo()) or 0
+ns.IsForever = (WOW_PROJECT_ID ~= nil and ((WOW_PROJECT_CAMELOT and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT) or WOW_PROJECT_ID == 18))
+    or (buildInterface >= 16000 and buildInterface < 17000)
 
 -- Cross-client API compatibility wrappers (WoW Forever 1.60.1 / 12.x vs Classic Era 1.15.x / MoP 5.5.x)
 function ns.IsSecretValue(val)

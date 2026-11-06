@@ -58,6 +58,8 @@ local L = {
     SETTINGS_ANCHOR_RIGHT = "Right of Group Loot (Default)",
     SETTINGS_ANCHOR_LEFT = "Left of Group Loot",
     SETTINGS_ANCHOR_FREE = "Free / Draggable Window",
+    SETTINGS_OPACITY = "Window Opacity",
+    SETTINGS_OPACITY_DESC = "Adjust the opacity/transparency of the ClearLoot window (100% = fully opaque).",
     SETTINGS_TEST_HEADER = "Solo Testing & Simulation",
     SETTINGS_TEST_SINGLE_BTN = "Test Single Item Roll",
     SETTINGS_TEST_MULTI_BTN = "Test 4-Item Boss Drop",
@@ -111,6 +113,8 @@ if locale == "ruRU" then
     L.SETTINGS_ANCHOR_RIGHT = "Справа от окна добычи (по умолчанию)"
     L.SETTINGS_ANCHOR_LEFT = "Слева от окна добычи"
     L.SETTINGS_ANCHOR_FREE = "Свободное (перемещаемое окно)"
+    L.SETTINGS_OPACITY = "Непрозрачность окна"
+    L.SETTINGS_OPACITY_DESC = "Настройка прозрачности окна ClearLoot (100% — полностью непрозрачное)."
     L.SETTINGS_TEST_HEADER = "Тестирование и симуляция"
     L.SETTINGS_TEST_SINGLE_BTN = "Тест: 1 предмет"
     L.SETTINGS_TEST_MULTI_BTN = "Тест: 4 предмета"
@@ -146,6 +150,8 @@ elseif locale == "deDE" then
     L.SETTINGS_ANCHOR_RIGHT = "Rechts neben Beutefenster (Standard)"
     L.SETTINGS_ANCHOR_LEFT = "Links neben Beutefenster"
     L.SETTINGS_ANCHOR_FREE = "Frei beweglich"
+    L.SETTINGS_OPACITY = "Fensterdeckkraft"
+    L.SETTINGS_OPACITY_DESC = "Deckkraft/Transparenz des ClearLoot-Fensters anpassen (100% = undurchsichtig)."
     L.SETTINGS_TEST_HEADER = "Simulation & Test"
     L.SETTINGS_TEST_SINGLE_BTN = "Test: Einzelner Gegenstand"
     L.SETTINGS_TEST_MULTI_BTN = "Test: 4 Gegenstände"
@@ -176,6 +182,8 @@ elseif locale == "frFR" then
     L.SETTINGS_ANCHOR_RIGHT = "À droite du butin (Défaut)"
     L.SETTINGS_ANCHOR_LEFT = "À gauche du butin"
     L.SETTINGS_ANCHOR_FREE = "Fenêtre libre / déplaçable"
+    L.SETTINGS_OPACITY = "Opacité de la fenêtre"
+    L.SETTINGS_OPACITY_DESC = "Ajuster l'opacité/transparence de la fenêtre ClearLoot (100% = opaque)."
     L.SETTINGS_TEST_SINGLE_BTN = "Test : 1 objet"
     L.SETTINGS_TEST_MULTI_BTN = "Test : 4 objets"
     L.SETTINGS_RESET_POS_BTN = "Réinitialiser la position"
@@ -199,6 +207,8 @@ elseif locale == "esES" or locale == "esMX" then
     L.SETTINGS_ANCHOR_RIGHT = "A la derecha del botín (Predeterminado)"
     L.SETTINGS_ANCHOR_LEFT = "A la izquierda del botín"
     L.SETTINGS_ANCHOR_FREE = "Ventana libre"
+    L.SETTINGS_OPACITY = "Opacidad de la ventana"
+    L.SETTINGS_OPACITY_DESC = "Ajusta la opacidad/transparencia de la ventana ClearLoot (100% = opaca)."
 end
 
 ns.L = L

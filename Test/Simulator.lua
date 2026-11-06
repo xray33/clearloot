@@ -10,31 +10,27 @@ local activeTimers = {}
 
 local MOCK_ITEMS = {
     {
-        itemID = 17074,
-        name = "Shadowstrike",
-        link = "|cffa335ee|Hitem:17074::::::::60:::::::|h[Shadowstrike]|h|r",
-        texture = "Interface\\Icons\\INV_Spear_08",
-        quality = 4,
+        itemID = 5191,
+        name = "Cruel Barb",
+        texture = "Interface\\Icons\\INV_Sword_24",
+        quality = 3,
     },
     {
-        itemID = 13359,
-        name = "Crown of Tyranny",
-        link = "|cff0070dd|Hitem:13359::::::::60:::::::|h[Crown of Tyranny]|h|r",
-        texture = "Interface\\Icons\\INV_Helmet_24",
+        itemID = 6460,
+        name = "Cobrahn's Grasp",
+        texture = "Interface\\Icons\\INV_Belt_03",
         quality = 3,
     },
     {
         itemID = 11992,
         name = "Band of the Steadfast",
-        link = "|cff1eff00|Hitem:11992::::::::60:::::::|h[Band of the Steadfast]|h|r",
         texture = "Interface\\Icons\\INV_Jewelry_Ring_03",
         quality = 2,
     },
     {
-        itemID = 12930,
-        name = "Briarwood Reed",
-        link = "|cff0070dd|Hitem:12930::::::::60:::::::|h[Briarwood Reed]|h|r",
-        texture = "Interface\\Icons\\INV_Misc_Root_02",
+        itemID = 5201,
+        name = "Emberstone Staff",
+        texture = "Interface\\Icons\\INV_Staff_13",
         quality = 3,
     },
 }
@@ -47,7 +43,7 @@ local MOCK_ROLES = {
     "TANK", "HEALER", "DAMAGER", "DAMAGER", "DAMAGER"
 }
 
-local MOCK_RAID_NAMES = {
+local MOCK_RAID_NAMES_CLASSIC = {
     "Thrall", "Garrosh", "Jaina", "Valeera", "Anduin",
     "Sylvanas", "Varian", "Cairne", "Voljin", "Tyrande",
     "Malfurion", "Illidan", "Arthas", "Uther", "Khadgar",
@@ -56,6 +52,17 @@ local MOCK_RAID_NAMES = {
     "Darion", "Chromie", "Kalecgos", "Alexstrasza", "Ysera",
     "Wrathion", "Alleria", "Turalyon", "Velen", "Muradin",
     "Brann", "Magni", "Gelbin", "Genn", "Baine",
+}
+
+local MOCK_RAID_NAMES_FOREVER = {
+    "Thrall Doomhammer", "Garrosh Hellscream", "Jaina Proudmoore", "Valeera Sanguinar", "Anduin Wrynn",
+    "Sylvanas Windrunner", "Varian Wrynn", "Cairne Bloodhoof", "Voljin Darkspear", "Tyrande Whisperwind",
+    "Malfurion Stormrage", "Illidan Stormrage", "Arthas Menethil", "Uther Lightbringer", "Khadgar Medivh",
+    "Medivh Aran", "Rexxar Moknathal", "Rokhan Shadow", "Chen Stormstout", "Gazlowe Steamwheedle",
+    "Varok Saurfang", "Nazgrel Frostwolf", "Eitrigg Blackrock", "Bolvar Fordragon", "Tirion Fordring",
+    "Darion Mograine", "Chromie Chronormu", "Kalecgos Azure", "Alexstrasza Lifebinder", "Ysera Dreamer",
+    "Wrathion Blacktalon", "Alleria Windrunner", "Turalyon Lothar", "Velen Prophet", "Muradin Bronzebeard",
+    "Brann Bronzebeard", "Magni Bronzebeard", "Gelbin Mekkatorque", "Genn Greymane", "Baine Bloodhoof",
 }
 
 local function CancelAllTimers()
@@ -90,6 +97,10 @@ local function ResolveMockItemInfo(mockItem, onResolved)
         }
     end
 
+    if C_Item and type(C_Item.RequestLoadItemDataByID) == "function" then
+        pcall(C_Item.RequestLoadItemDataByID, mockItem.itemID)
+    end
+
     -- Request item data from server asynchronously so it updates to the client's locale as soon as cached
     if Item and Item.CreateFromItemID then
         local ok, itemObj = pcall(Item.CreateFromItemID, Item, mockItem.itemID)
@@ -106,7 +117,7 @@ local function ResolveMockItemInfo(mockItem, onResolved)
     return {
         itemID = mockItem.itemID,
         name = mockItem.name,
-        link = mockItem.link,
+        link = nil, -- Only attach hyperlink once server confirms item exists in this client's database
         texture = mockItem.texture,
         quality = mockItem.quality,
     }
@@ -139,8 +150,8 @@ local function SpawnSimulatedItemRoll(mockItem, baseDelay, numGroupMembers)
     })
 
     -- Include the actual player + mock party/raid members up to targetSize
-    local rawName = UnitName("player")
-    local myName = (rawName and not ns.IsSecretValue(rawName)) and rawName or "Player"
+    local myDisplayName = ns.RosterInspector:GetUnitNames("player")
+    local myName = (myDisplayName and myDisplayName ~= "") and myDisplayName or (ns.IsForever and "Player Hero" or "Player")
     local _, rawClass = UnitClass("player")
     local myClass = (rawClass and not ns.IsSecretValue(rawClass)) and rawClass or "PALADIN"
     local myRole = (UnitGroupRolesAssigned and UnitGroupRolesAssigned("player")) or "DAMAGER"
@@ -149,9 +160,10 @@ local function SpawnSimulatedItemRoll(mockItem, baseDelay, numGroupMembers)
     local roster = {
         { name = myName, class = myClass or "PALADIN", role = myRole },
     }
-    for i = 1, #MOCK_RAID_NAMES do
+    local namePool = ns.IsForever and MOCK_RAID_NAMES_FOREVER or MOCK_RAID_NAMES_CLASSIC
+    for i = 1, #namePool do
         if #roster >= targetSize then break end
-        local name = MOCK_RAID_NAMES[i]
+        local name = namePool[i]
         if name ~= myName then
             table.insert(roster, {
                 name = name,
