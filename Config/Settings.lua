@@ -219,7 +219,87 @@ function SettingsModule:Init()
         ns:Print(L.MSG_POS_RESET)
     end)
 
-    y = y - 68
+    y = y - 64
+
+    -- Window Opacity Slider (pure-Lua Slider, no deprecated XML template dependency)
+    local opacityLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    opacityLabel:SetPoint("TOPLEFT", 20, y)
+
+    local opacitySlider = CreateFrame("Slider", "ClearLootOpacitySlider", panel, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    opacitySlider:SetSize(220, 16)
+    opacitySlider:SetPoint("TOPLEFT", opacityLabel, "BOTTOMLEFT", 0, -8)
+    opacitySlider:SetOrientation("HORIZONTAL")
+    opacitySlider:SetMinMaxValues(20, 100)
+    opacitySlider:SetValueStep(5)
+    if opacitySlider.SetObeyStepOnDrag then
+        opacitySlider:SetObeyStepOnDrag(true)
+    end
+
+    if opacitySlider.SetBackdrop then
+        opacitySlider:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            edgeSize = 8,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 },
+        })
+        opacitySlider:SetBackdropColor(0.08, 0.08, 0.10, 0.85)
+        opacitySlider:SetBackdropBorderColor(0.6, 0.5, 0.3, 0.9)
+    else
+        local sliderBg = opacitySlider:CreateTexture(nil, "BACKGROUND")
+        sliderBg:SetAllPoints(opacitySlider)
+        sliderBg:SetColorTexture(0.08, 0.08, 0.10, 0.85)
+    end
+
+    local sliderThumb = opacitySlider:CreateTexture(nil, "ARTWORK")
+    sliderThumb:SetSize(14, 20)
+    sliderThumb:SetTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+    opacitySlider:SetThumbTexture(sliderThumb)
+
+    local minLabel = opacitySlider:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    minLabel:SetPoint("TOPLEFT", opacitySlider, "BOTTOMLEFT", 0, -2)
+    minLabel:SetText("20%")
+
+    local maxLabel = opacitySlider:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    maxLabel:SetPoint("TOPRIGHT", opacitySlider, "BOTTOMRIGHT", 0, -2)
+    maxLabel:SetText("100%")
+
+    local function UpdateOpacityLabel(val)
+        opacityLabel:SetText(string.format("%s: |cffffffff%d%%|r", L.SETTINGS_OPACITY, val))
+    end
+
+    opacitySlider:SetScript("OnShow", function(self)
+        local val = (ns.db and tonumber(ns.db.windowOpacity)) or 100
+        self._updating = true
+        self:SetValue(val)
+        self._updating = false
+        UpdateOpacityLabel(val)
+    end)
+
+    opacitySlider:SetScript("OnValueChanged", function(self, value)
+        local rounded = math.floor(((value or 100) / 5) + 0.5) * 5
+        if rounded < 20 then rounded = 20 end
+        if rounded > 100 then rounded = 100 end
+        UpdateOpacityLabel(rounded)
+        if self._updating then return end
+        ns.db.windowOpacity = rounded
+        if ns.RollTrackerFrame and ns.RollTrackerFrame.UpdateOpacity then
+            ns.RollTrackerFrame:UpdateOpacity()
+        end
+    end)
+
+    opacitySlider:SetScript("OnEnter", function(self)
+        if L.SETTINGS_OPACITY_DESC then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(L.SETTINGS_OPACITY, 1, 0.82, 0)
+            GameTooltip:AddLine(L.SETTINGS_OPACITY_DESC, 0.85, 0.85, 0.85, true)
+            GameTooltip:Show()
+        end
+    end)
+    opacitySlider:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    y = y - 62
 
     -- Solo Testing & Simulation Section
     local testHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")

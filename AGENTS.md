@@ -27,9 +27,14 @@ When writing or modifying Lua code in this repository, always keep the **modern 
      - If the player is simulated or not in the current unit list, call `UnitPopup_OpenMenu("FRIEND", { name = targetName, chatType = "PARTY", chatTarget = targetName, chatFrame = DEFAULT_CHAT_FRAME, lineID = 0 })` or `FriendsFrame_ShowDropdown(targetName, 1, 0, "PARTY", DEFAULT_CHAT_FRAME)`.
 
 4. **Localization & Item Links:**
-   - Never display raw `itemLink` strings in the window title if you want a clean header without `[` `]` brackets; extract `itemName` and color it via `GetItemQualityColor(itemQuality)`.
-   - In `Test/Simulator.lua`, never rely solely on hardcoded English item strings. Always resolve item IDs through `GetItemInfo(itemID)` and `Item:CreateFromItemID(itemID):ContinueOnItemLoad(...)` so the client's localized item name is used.
+   - Never display raw `itemLink` strings in the window title if you want a clean header without `[` `]` brackets; extract `itemName` and color it via `ns.GetItemQualityColor(itemQuality)`.
+   - In `Test/Simulator.lua`, never rely solely on hardcoded English item strings. Always resolve item IDs through `ns.GetItemInfo(itemID)` (`C_Item.GetItemInfo` in Forever 1.60.1) and `Item:CreateFromItemID(itemID):ContinueOnItemLoad(...)` so the client's localized item name is used.
    - All user-facing UI strings belong in `Locales.lua` (`ns.L`). Prefer Blizzard's built-in localized constants (`_G.NEED`, `_G.GREED`, `_G.PASS`, `_G.ROLL_DISENCHANT`, `_G.WHISPER`, `_G.INSPECT`, `_G.INVITE`, `_G.CANCEL`) whenever available.
+
+5. **WoW Forever (`1.60.1` / `WOW_PROJECT_ID == 18`) Specific Quirks:**
+   - **Mandatory Two-Part Character Names (First + Last Name):** Every character in WoW Forever has a mandatory First Name and Surname (`Last Name`). `UnitFullName(unit)` returns `firstName, surname` (whereas `UnitName("player")` only returns `firstName, nil`). Always use `RosterInspector:GetUnitNames(unit)` and `RosterInspector:GetShortName(name)` so `"First-Last"` and `"First Last"` normalize to `"First Last"` and never get split on `-` as if `-Last` were a realm name.
+   - **12.0 Engine Namespace Changes:** Global `GetItemInfo` and `GetItemQualityColor` are removed in Forever 1.60.1; always use `ns.GetItemInfo` (`C_Item.GetItemInfo`) and `ns.GetItemQualityColor` (`C_Item.GetItemQualityColor`).
+   - **Per-File Symlinks (`./scripts/link_addon.sh`):** Use real directories with per-file symlinks inside `Interface/AddOns/ClearLoot` so external addon managers (like the CurseForge desktop app) cannot traverse a directory symlink and delete source files in the Git repository.
 
 ---
 

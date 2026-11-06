@@ -235,8 +235,34 @@ function DataTracker:SetPlayerRoll(rollID, playerName, classFile, rollType, roll
     local session = rollsByID[rollID]
     if not session or not playerName then return end
 
-    local shortName = ns.RosterInspector:GetShortName(playerName)
     local rosterInfo = ns.RosterInspector:GetPlayerInfo(playerName, classFile, role)
+    local shortName = (rosterInfo and rosterInfo.name) or ns.RosterInspector:GetShortName(playerName)
+
+    -- In WoW Forever, characters always have 2 names ("First Last").
+    -- Prevent duplicate rows if one source reported only "First" and another reported "First Last".
+    if ns.IsForever then
+        local firstWord, secondWord = shortName:match("^([^%s]+)%s+(.+)$")
+        if firstWord and secondWord then
+            -- If a single-name placeholder ("First") exists, upgrade and remove it
+            local partial = session.players[firstWord]
+            if partial and not session.players[shortName] then
+                session.players[firstWord] = nil
+                partial.name = shortName
+                session.players[shortName] = partial
+            elseif partial and session.players[shortName] then
+                session.players[firstWord] = nil
+            end
+        else
+            -- `shortName` has only 1 word ("First"); check if "First Last" is already in `session.players`
+            for existingKey, existingEntry in pairs(session.players) do
+                local exFirst = existingKey:match("^([^%s]+)%s+.+$")
+                if exFirst and exFirst == shortName then
+                    shortName = existingKey
+                    break
+                end
+            end
+        end
+    end
 
     local entry = session.players[shortName]
     if not entry then
@@ -542,8 +568,8 @@ function DataTracker:OnChatMsgLoot(msg)
 
             local playerName = parsed.player
             if entry.isSelf then
-                local myName = UnitName("player")
-                playerName = (myName and not ns.IsSecretValue(myName)) and myName or nil
+                local myDisplayName = ns.RosterInspector:GetUnitNames("player")
+                playerName = myDisplayName
             end
             local itemLink = parsed.item
             local rollScore = parsed.roll and tonumber(parsed.roll) or nil

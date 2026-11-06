@@ -5,11 +5,64 @@ ns.RosterInspector = RosterInspector
 
 local playerCache = {}
 
--- Normalize player name by stripping realm suffix if same realm or matching short name
+-- Normalize player name:
+-- - In WoW Forever (1.60.1), characters always have 2 names (First Name + Last Name).
+--   Normalize "First-Last", "First Last", or "First-Last-Realm" into "First Last".
+-- - In Classic Era / Anniversary / MoP, strip "-Realm" suffix.
 function RosterInspector:GetShortName(fullName)
     if not fullName or ns.IsSecretValue(fullName) or type(fullName) ~= "string" then return "" end
-    local short = fullName:match("^([^%-]+)")
-    return short or fullName
+    local trimmed = fullName:match("^%s*(.-)%s*$") or fullName
+    if trimmed == "" then return "" end
+
+    if ns.IsForever then
+        local first, second = trimmed:match("^([^%-%s]+)[%-%s]+([^%-%s]+)")
+        if first and second then
+            return first .. " " .. second
+        end
+        local cached = playerCache[trimmed]
+        if cached and cached.name then
+            return cached.name
+        end
+        return trimmed
+    end
+
+    local short = trimmed:match("^([^%-]+)")
+    return short or trimmed
+end
+
+function RosterInspector:GetUnitNames(unit)
+    if not UnitExists(unit) then return nil, nil, nil end
+
+    local first, second
+    if ns.IsForever and type(UnitFullName) == "function" then
+        first, second = UnitFullName(unit)
+    end
+    if not first or ns.IsSecretValue(first) then
+        first, second = UnitName(unit)
+    end
+    if not first or ns.IsSecretValue(first) or first == UNKNOWNOBJECT then
+        return nil, nil, nil
+    end
+    if ns.IsSecretValue(second) then
+        second = nil
+    end
+
+    if ns.IsForever then
+        -- In WoW Forever, `first` is First Name and `second` is Surname / Last Name
+        if second and second ~= "" then
+            local displayName = first .. " " .. second
+            local hyphenName = first .. "-" .. second
+            return displayName, hyphenName, first
+        end
+        local f1, f2 = first:match("^([^%-%s]+)[%-%s]+([^%-%s]+)")
+        if f1 and f2 then
+            return f1 .. " " .. f2, f1 .. "-" .. f2, f1
+        end
+        return first, first, first
+    end
+
+    local fullName = (second and second ~= "") and (first .. "-" .. second) or first
+    return first, fullName, first
 end
 
 function RosterInspector:GetClassColorHex(classFile)
@@ -30,57 +83,56 @@ function RosterInspector:ColorizeName(name, classFile)
 end
 
 local function CacheUnit(unit)
-    if not UnitExists(unit) then return end
-    local name, realm = UnitName(unit)
-    if not name or ns.IsSecretValue(name) or name == UNKNOWNOBJECT then return end
-    if ns.IsSecretValue(realm) then realm = nil end
+    local displayName, fullName, firstOnly = RosterInspector:GetUnitNames(unit)
+    if not displayName then return end
 
-    local fullName = (realm and realm ~= "") and (name .. "-" .. realm) or name
     local _, classFile = UnitClass(unit)
     if ns.IsSecretValue(classFile) then classFile = nil end
     local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit) or "NONE"
     if ns.IsSecretValue(role) then role = "NONE" end
 
-    local entry = playerCache[name] or {}
-    entry.name = name
-    entry.fullName = fullName
+    local entry = playerCache[displayName] or (firstOnly and playerCache[firstOnly]) or {}
+    entry.name = displayName
+    entry.fullName = fullName or displayName
+    entry.firstOnly = firstOnly
     entry.unit = unit
     entry.class = classFile or entry.class
     if role and role ~= "NONE" then
         entry.role = role
     end
 
-    playerCache[name] = entry
-    playerCache[fullName] = entry
+    playerCache[displayName] = entry
+    if fullName then
+        playerCache[fullName] = entry
+    end
+    if firstOnly then
+        playerCache[firstOnly] = entry
+    end
 end
 
 function RosterInspector:FindUnitByName(name)
     if not name or ns.IsSecretValue(name) then return nil end
     local shortName = self:GetShortName(name)
 
-    local myName = UnitName("player")
-    if myName and not ns.IsSecretValue(myName) and (myName == name or myName == shortName) then
+    local myDisplay, myFull, myFirst = self:GetUnitNames("player")
+    if myDisplay and (myDisplay == name or myDisplay == shortName or myFull == name or myFirst == name) then
         return "player", "SELF"
     end
 
     if IsInRaid() then
         for i = 1, 40 do
             local u = "raid" .. i
-            if UnitExists(u) then
-                local uName = UnitName(u)
-                if uName and not ns.IsSecretValue(uName) and (uName == name or uName == shortName) then
-                    return u, "RAID_PLAYER"
-                end
+            local uDisplay, uFull, uFirst = self:GetUnitNames(u)
+            if uDisplay and (uDisplay == name or uDisplay == shortName or uFull == name or uFirst == name) then
+                return u, "RAID_PLAYER"
             end
         end
     elseif IsInGroup() then
         for i = 1, 4 do
             local u = "party" .. i
-            if UnitExists(u) then
-                local uName = UnitName(u)
-                if uName and not ns.IsSecretValue(uName) and (uName == name or uName == shortName) then
-                    return u, "PARTY"
-                end
+            local uDisplay, uFull, uFirst = self:GetUnitNames(u)
+            if uDisplay and (uDisplay == name or uDisplay == shortName or uFull == name or uFirst == name) then
+                return u, "PARTY"
             end
         end
     end
@@ -141,22 +193,20 @@ function RosterInspector:GetEligibleGroupMembers()
     local seen = {}
 
     local function AddUnit(unit)
-        if UnitExists(unit) then
-            local name, realm = UnitName(unit)
-            if name and not ns.IsSecretValue(name) and name ~= UNKNOWNOBJECT and not seen[name] then
-                if ns.IsSecretValue(realm) then realm = nil end
-                seen[name] = true
-                local _, classFile = UnitClass(unit)
-                if ns.IsSecretValue(classFile) then classFile = nil end
-                local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit) or "NONE"
-                if ns.IsSecretValue(role) then role = "NONE" end
-                table.insert(members, {
-                    name = name,
-                    fullName = (realm and realm ~= "") and (name .. "-" .. realm) or name,
-                    class = classFile,
-                    role = role,
-                })
-            end
+        local displayName, fullName, firstOnly = self:GetUnitNames(unit)
+        if displayName and not seen[displayName] then
+            seen[displayName] = true
+            local _, classFile = UnitClass(unit)
+            if ns.IsSecretValue(classFile) then classFile = nil end
+            local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit) or "NONE"
+            if ns.IsSecretValue(role) then role = "NONE" end
+            table.insert(members, {
+                name = displayName,
+                fullName = fullName or displayName,
+                firstOnly = firstOnly,
+                class = classFile,
+                role = role,
+            })
         end
     end
 
@@ -183,6 +233,9 @@ function RosterInspector:Init()
         RosterInspector:ScanGroup()
     end)
     ns:RegisterEvent("ROLE_CHANGED_INFORM", function()
+        RosterInspector:ScanGroup()
+    end)
+    ns:RegisterEvent("UNIT_NAME_UPDATE", function()
         RosterInspector:ScanGroup()
     end)
 end

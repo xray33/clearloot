@@ -5,8 +5,8 @@ local DataTracker = ns.DataTracker
 local RollTrackerFrame = {}
 ns.RollTrackerFrame = RollTrackerFrame
 
-local WINDOW_WIDTH = 285
-local HEADER_HEIGHT = 82
+local WINDOW_WIDTH = 336
+local HEADER_HEIGHT = 56
 local FOOTER_HEIGHT = 26
 local ROW_HEIGHT = 20
 local MIN_VISIBLE_ROWS = 5
@@ -244,8 +244,9 @@ local function CreatePlayerRow(parent, index)
     local row = CreateFrame("Button", nil, parent)
     row:SetSize(WINDOW_WIDTH - 24, ROW_HEIGHT)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row.rowIndex = index
 
-    -- Alternating subtle stripe background
+    -- Alternating subtle stripe background (or leader gold highlight)
     local bg = row:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(row)
     if index % 2 == 1 then
@@ -260,7 +261,7 @@ local function CreatePlayerRow(parent, index)
     hl:SetAllPoints(row)
     hl:SetColorTexture(1, 0.82, 0, 0.14)
 
-    -- 1. Rank Number ("1)")
+    -- 1. Rank Number ("1.")
     local rankText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     rankText:SetPoint("LEFT", 4, 0)
     rankText:SetWidth(18)
@@ -278,7 +279,7 @@ local function CreatePlayerRow(parent, index)
     -- 3. Player Name (Class Colored)
     local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     nameText:SetPoint("LEFT", classIcon, "RIGHT", 5, 0)
-    nameText:SetWidth(98)
+    nameText:SetWidth(124)
     nameText:SetJustifyH("LEFT")
     nameText:SetWordWrap(false)
     row.nameText = nameText
@@ -293,13 +294,13 @@ local function CreatePlayerRow(parent, index)
     -- 5. Roll Choice Icon (Dice / Coin / DE / Pass / Pending)
     local choiceIcon = row:CreateTexture(nil, "ARTWORK")
     choiceIcon:SetSize(15, 15)
-    choiceIcon:SetPoint("LEFT", roleIcon, "RIGHT", 6, 0)
+    choiceIcon:SetPoint("LEFT", roleIcon, "RIGHT", 5, 0)
     row.choiceIcon = choiceIcon
 
     -- 6. Roll Choice Text ("Need", "Greed", "Pass")
     local choiceText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     choiceText:SetPoint("LEFT", choiceIcon, "RIGHT", 4, 0)
-    choiceText:SetWidth(54)
+    choiceText:SetWidth(76)
     choiceText:SetJustifyH("LEFT")
     choiceText:SetWordWrap(false)
     row.choiceText = choiceText
@@ -307,7 +308,7 @@ local function CreatePlayerRow(parent, index)
     -- 7. Roll Score ("94")
     local scoreText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     scoreText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-    scoreText:SetWidth(28)
+    scoreText:SetWidth(26)
     scoreText:SetJustifyH("RIGHT")
     row.scoreText = scoreText
 
@@ -464,11 +465,15 @@ function RollTrackerFrame:Init()
 
     itemHeader:SetScript("OnEnter", function(self)
         local session = DataTracker:GetCurrentRollSession()
-        if session and session.itemLink then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if not session then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        if session.itemLink then
             GameTooltip:SetHyperlink(session.itemLink)
-            GameTooltip:Show()
+        elseif session.itemName then
+            local r, g, b = ns.GetItemQualityColor(session.itemQuality or 2)
+            GameTooltip:SetText(session.itemName, r or 1, g or 1, b or 1)
         end
+        GameTooltip:Show()
     end)
     itemHeader:SetScript("OnLeave", function()
         GameTooltip:Hide()
@@ -481,42 +486,10 @@ function RollTrackerFrame:Init()
         frame:GetScript("OnDragStop")(frame)
     end)
 
-    -- Provisional Winner Banner
-    local winnerBanner = CreateFrame("Frame", nil, frame, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    winnerBanner:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -34)
-    winnerBanner:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -34)
-    winnerBanner:SetHeight(22)
-    if winnerBanner.SetBackdrop then
-        winnerBanner:SetBackdrop({
-            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true,
-            tileSize = 8,
-            edgeSize = 10,
-            insets = { left = 2, right = 2, top = 2, bottom = 2 },
-        })
-        winnerBanner:SetBackdropColor(0.22, 0.17, 0.04, 0.9)
-        winnerBanner:SetBackdropBorderColor(0.90, 0.72, 0.20, 0.9)
-    end
-
-    local crownIcon = winnerBanner:CreateTexture(nil, "ARTWORK")
-    crownIcon:SetSize(14, 14)
-    crownIcon:SetPoint("LEFT", winnerBanner, "LEFT", 6, 0)
-    crownIcon:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
-    frame.crownIcon = crownIcon
-
-    local winnerText = winnerBanner:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    winnerText:SetPoint("LEFT", crownIcon, "RIGHT", 4, 0)
-    winnerText:SetPoint("RIGHT", winnerBanner, "RIGHT", -6, 0)
-    winnerText:SetJustifyH("CENTER")
-    winnerText:SetWordWrap(false)
-    frame.winnerText = winnerText
-    frame.winnerBanner = winnerBanner
-
     -- Column Headers Row
     local colHeader = CreateFrame("Frame", nil, frame)
-    colHeader:SetPoint("TOPLEFT", winnerBanner, "BOTTOMLEFT", 0, -4)
-    colHeader:SetPoint("TOPRIGHT", winnerBanner, "BOTTOMRIGHT", 0, -4)
+    colHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -34)
+    colHeader:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -34)
     colHeader:SetHeight(16)
 
     local hRank = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -525,12 +498,12 @@ function RollTrackerFrame:Init()
     hRank:SetTextColor(0.85, 0.75, 0.45)
 
     local hName = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hName:SetPoint("LEFT", 40, 0)
+    hName:SetPoint("LEFT", 44, 0)
     hName:SetText(L.HEADER_NAME)
     hName:SetTextColor(0.85, 0.75, 0.45)
 
     local hChoice = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hChoice:SetPoint("LEFT", 168, 0)
+    hChoice:SetPoint("LEFT", 189, 0)
     hChoice:SetText(L.HEADER_CHOICE)
     hChoice:SetTextColor(0.85, 0.75, 0.45)
 
@@ -611,6 +584,15 @@ function RollTrackerFrame:Init()
 
     frame:Hide()
     self.frame = frame
+    self:UpdateOpacity()
+end
+
+function RollTrackerFrame:UpdateOpacity()
+    if not self.frame then return end
+    local pct = (ns.db and tonumber(ns.db.windowOpacity)) or 100
+    if pct < 20 then pct = 20 end
+    if pct > 100 then pct = 100 end
+    self.frame:SetAlpha(pct / 100)
 end
 
 function RollTrackerFrame:HideWindow()
@@ -727,6 +709,11 @@ function RollTrackerFrame:UpdatePlayerRows()
     end
 
     local rowWidth = hasScrollbar and (WINDOW_WIDTH - 34) or (WINDOW_WIDTH - 20)
+    local leaders = self.currentEval.leaders or {}
+    local isLeaderMap = {}
+    for _, l in ipairs(leaders) do
+        isLeaderMap[l] = true
+    end
 
     for i = 1, MAX_VISIBLE_ROWS do
         local row = frame.rows[i]
@@ -734,11 +721,25 @@ function RollTrackerFrame:UpdatePlayerRows()
 
         if i <= visibleRows and dataIdx <= numPlayers then
             local p = players[dataIdx]
+            local isLeader = isLeaderMap[p] == true
             row:SetWidth(rowWidth)
             row.playerData = p
 
-            -- 1. Rank
-            row.rankText:SetText(dataIdx .. ")")
+            -- Subtle highlight for leading row(s)
+            if isLeader then
+                row.bg:SetColorTexture(0.85, 0.68, 0.15, 0.18)
+                row.rankText:SetTextColor(1.0, 0.85, 0.15)
+            else
+                if (row.rowIndex or i) % 2 == 1 then
+                    row.bg:SetColorTexture(1, 1, 1, 0.04)
+                else
+                    row.bg:SetColorTexture(0, 0, 0, 0.15)
+                end
+                row.rankText:SetTextColor(0.8, 0.8, 0.8)
+            end
+
+            -- 1. Rank ("1.", "2.")
+            row.rankText:SetText(dataIdx .. ".")
 
             -- 2. Class Icon
             local coords = p.class and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[p.class]
@@ -775,8 +776,8 @@ function RollTrackerFrame:UpdatePlayerRows()
             -- 6. Roll Score
             if p.rollScore and p.rollScore > 0 then
                 row.scoreText:SetText(tostring(p.rollScore))
-                if self.currentEval.leaders and self.currentEval.leaders[1] == p then
-                    row.scoreText:SetTextColor(1.0, 0.85, 0.1)
+                if isLeader then
+                    row.scoreText:SetTextColor(1.0, 0.85, 0.15)
                 else
                     row.scoreText:SetTextColor(1.0, 1.0, 1.0)
                 end
@@ -833,35 +834,11 @@ function RollTrackerFrame:Refresh(isNewRoll)
     frame.itemTitle:SetText(cleanName or "Item")
     frame.itemTitle:SetTextColor(r or 1, g or 1, b or 1)
 
-    -- Evaluate Provisional Winner & Player List
+    -- Evaluate Player List & Leaders
     local eval = DataTracker:EvaluateSession(session)
     self.currentEval = eval
 
     if eval then
-        if #eval.leaders == 1 then
-            local leader = eval.leaders[1]
-            local coloredLeader = ns.RosterInspector:ColorizeName(leader.name, leader.class)
-            local typeLabel = DataTracker:GetRollTypeLabel(eval.bestType)
-            local scoreVal = eval.bestScore > 0 and eval.bestScore or 0
-            local fmt = eval.isComplete and L.WINNER_WON or L.WINNER_LEADING
-            frame.winnerText:SetText(string.format(fmt, coloredLeader, typeLabel, scoreVal))
-            frame.crownIcon:Show()
-        elseif #eval.leaders > 1 then
-            local names = {}
-            for _, p in ipairs(eval.leaders) do
-                table.insert(names, ns.RosterInspector:ColorizeName(p.name, p.class))
-            end
-            local typeLabel = DataTracker:GetRollTypeLabel(eval.bestType)
-            frame.winnerText:SetText(string.format(L.WINNER_TIE, typeLabel, eval.bestScore, table.concat(names, ", ")))
-            frame.crownIcon:Show()
-        elseif eval.allPassed then
-            frame.winnerText:SetText(L.WINNER_ALL_PASSED)
-            frame.crownIcon:Hide()
-        else
-            frame.winnerText:SetText(L.WINNER_WAITING)
-            frame.crownIcon:Hide()
-        end
-
         if eval.isComplete then
             frame.footerText:SetText(string.format(L.FOOTER_COMPLETE, eval.answeredPlayers, eval.totalPlayers))
         else
@@ -869,6 +846,7 @@ function RollTrackerFrame:Refresh(isNewRoll)
         end
     end
 
+    self:UpdateOpacity()
     self:UpdatePlayerRows()
     frame:Show()
     if frame.Raise then
