@@ -18,9 +18,11 @@ local DEFAULT_SETTINGS = {
     keepOpenAfterMyRoll = true,
     hidePassed = false,
     hidePending = false,
-    windowOpacity = 100,  -- 20..100 (%)
-    anchorSide = "RIGHT", -- "RIGHT", "LEFT", or "FREE"
-    freePosition = nil,   -- { point = "CENTER", relativePoint = "CENTER", x = 220, y = 0 }
+    choiceDisplay = "ICONS", -- "ICONS", "TEXT", or "BOTH"
+    windowOpacity = 100,     -- 20..100 (%)
+    windowScale = 100,       -- 60..160 (%)
+    anchorSide = "RIGHT",    -- "RIGHT", "LEFT", or "FREE"
+    freePosition = nil,      -- { point = "CENTER", relativePoint = "CENTER", x = 220, y = 0 }
 }
 
 local eventFrame = CreateFrame("Frame", "ClearLootEventFrame")
@@ -159,6 +161,10 @@ local function ExecuteSlashCommand(msg)
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:ForceShowCurrent()
         end
+    elseif cmd == "move" or cmd == "unlock" or cmd == "lock" then
+        if ns.RollTrackerFrame and ns.RollTrackerFrame.ToggleMoveMode then
+            ns.RollTrackerFrame:ToggleMoveMode()
+        end
     elseif cmd == "reset" then
         ns.db.freePosition = nil
         ns.db.anchorSide = "RIGHT"
@@ -177,6 +183,9 @@ local function ExecuteSlashCommand(msg)
         ns:Print(L.SLASH_HELP_TESTRAID)
         ns:Print(L.SLASH_HELP_STOP)
         ns:Print(L.SLASH_HELP_SHOW)
+        if L.SLASH_HELP_MOVE then
+            ns:Print(L.SLASH_HELP_MOVE)
+        end
         ns:Print(L.SLASH_HELP_CONFIG)
     end
 end

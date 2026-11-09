@@ -86,4 +86,11 @@ end
 function MultiItemManager:Init()
     self:HookGroupLootFrames()
     self:UpdateAnchoring()
+
+    ns:RegisterEvent("UI_SCALE_CHANGED", function()
+        self:UpdateAnchoring()
+    end)
+    ns:RegisterEvent("DISPLAY_SIZE_CHANGED", function()
+        self:UpdateAnchoring()
+    end)
 end
