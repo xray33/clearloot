@@ -45,6 +45,187 @@ local function CreateCheckbox(parent, label, tooltip, dbKey, yOffset, onChange)
     return cb
 end
 
+local function CreateDropdown(parent, globalName, labelText, xOffset, yOffset, width, options, dbKey, defaultValue, onSelect)
+    local label = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    label:SetPoint("TOPLEFT", xOffset, yOffset)
+    label:SetText(labelText)
+
+    local function GetOptionText(val)
+        for _, opt in ipairs(options) do
+            if opt.value == val then return opt.text end
+        end
+        return options[1] and options[1].text or ""
+    end
+
+    local hasLegacyDropdown = (not DoesTemplateExist or DoesTemplateExist("UIDropDownMenuTemplate"))
+        and type(UIDropDownMenu_SetWidth) == "function"
+        and type(UIDropDownMenu_Initialize) == "function"
+
+    local widget
+    local UpdateDisplay
+
+    if hasLegacyDropdown then
+        local dropdown = CreateFrame("Frame", globalName, parent, "UIDropDownMenuTemplate")
+        dropdown:SetPoint("TOPLEFT", label, "BOTTOMLEFT", -16, -4)
+
+        UpdateDisplay = function(val)
+            UIDropDownMenu_SetText(dropdown, GetOptionText(val))
+        end
+
+        UIDropDownMenu_SetWidth(dropdown, width)
+        UIDropDownMenu_Initialize(dropdown, function(self, level)
+            for _, opt in ipairs(options) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = opt.text
+                info.value = opt.value
+                info.checked = ((ns.db[dbKey] or defaultValue) == opt.value)
+                info.func = function()
+                    ns.db[dbKey] = opt.value
+                    UpdateDisplay(opt.value)
+                    if onSelect then
+                        onSelect(opt.value)
+                    end
+                end
+                UIDropDownMenu_AddButton(info, level)
+            end
+        end)
+
+        dropdown:SetScript("OnShow", function()
+            UpdateDisplay(ns.db[dbKey] or defaultValue)
+        end)
+        widget = dropdown
+    else
+        local btn = CreateFrame("Button", globalName .. "Button", parent, "UIPanelButtonTemplate")
+        btn:SetSize(width + 20, 24)
+        btn:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -6)
+
+        UpdateDisplay = function(val)
+            btn:SetText(GetOptionText(val))
+        end
+
+        btn:SetScript("OnShow", function()
+            UpdateDisplay(ns.db[dbKey] or defaultValue)
+        end)
+
+        btn:SetScript("OnClick", function(self)
+            if MenuUtil and type(MenuUtil.CreateContextMenu) == "function" then
+                MenuUtil.CreateContextMenu(self, function(_, rootDescription)
+                    for _, opt in ipairs(options) do
+                        rootDescription:CreateRadio(opt.text, function()
+                            return (ns.db[dbKey] or defaultValue) == opt.value
+                        end, function()
+                            ns.db[dbKey] = opt.value
+                            UpdateDisplay(opt.value)
+                            if onSelect then
+                                onSelect(opt.value)
+                            end
+                        end)
+                    end
+                end)
+            else
+                local cur = ns.db[dbKey] or defaultValue
+                local nextIdx = 1
+                for idx, opt in ipairs(options) do
+                    if opt.value == cur then
+                        nextIdx = (idx % #options) + 1
+                        break
+                    end
+                end
+                local chosen = options[nextIdx]
+                ns.db[dbKey] = chosen.value
+                UpdateDisplay(chosen.value)
+                if onSelect then
+                    onSelect(chosen.value)
+                end
+            end
+        end)
+        widget = btn
+    end
+
+    return widget, UpdateDisplay
+end
+
+local function CreatePercentSlider(parent, globalName, labelText, tooltipText, xOffset, yOffset, minVal, maxVal, stepVal, dbKey, defaultVal, onChange)
+    local label = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    label:SetPoint("TOPLEFT", xOffset, yOffset)
+
+    local slider = CreateFrame("Slider", globalName, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    slider:SetSize(220, 16)
+    slider:SetPoint("TOPLEFT", label, "BOTTOMLEFT", 0, -8)
+    slider:SetOrientation("HORIZONTAL")
+    slider:SetMinMaxValues(minVal, maxVal)
+    slider:SetValueStep(stepVal)
+    if slider.SetObeyStepOnDrag then
+        slider:SetObeyStepOnDrag(true)
+    end
+
+    if slider.SetBackdrop then
+        slider:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            edgeSize = 8,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 },
+        })
+        slider:SetBackdropColor(0.08, 0.08, 0.10, 0.85)
+        slider:SetBackdropBorderColor(0.6, 0.5, 0.3, 0.9)
+    else
+        local sliderBg = slider:CreateTexture(nil, "BACKGROUND")
+        sliderBg:SetAllPoints(slider)
+        sliderBg:SetColorTexture(0.08, 0.08, 0.10, 0.85)
+    end
+
+    local sliderThumb = slider:CreateTexture(nil, "ARTWORK")
+    sliderThumb:SetSize(14, 20)
+    sliderThumb:SetTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+    slider:SetThumbTexture(sliderThumb)
+
+    local minLabel = slider:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    minLabel:SetPoint("TOPLEFT", slider, "BOTTOMLEFT", 0, -2)
+    minLabel:SetText(minVal .. "%")
+
+    local maxLabel = slider:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    maxLabel:SetPoint("TOPRIGHT", slider, "BOTTOMRIGHT", 0, -2)
+    maxLabel:SetText(maxVal .. "%")
+
+    local function UpdateLabel(val)
+        label:SetText(string.format("%s: |cffffffff%d%%|r", labelText, val))
+    end
+
+    slider:SetScript("OnShow", function(self)
+        local val = (ns.db and tonumber(ns.db[dbKey])) or defaultVal
+        self._updating = true
+        self:SetValue(val)
+        self._updating = false
+        UpdateLabel(val)
+    end)
+
+    slider:SetScript("OnValueChanged", function(self, value)
+        local rounded = math.floor(((value or defaultVal) / stepVal) + 0.5) * stepVal
+        if rounded < minVal then rounded = minVal end
+        if rounded > maxVal then rounded = maxVal end
+        UpdateLabel(rounded)
+        if self._updating then return end
+        ns.db[dbKey] = rounded
+        if onChange then
+            onChange(rounded)
+        end
+    end)
+
+    slider:SetScript("OnEnter", function(self)
+        if tooltipText then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(labelText, 1, 0.82, 0)
+            GameTooltip:AddLine(tooltipText, 0.85, 0.85, 0.85, true)
+            GameTooltip:Show()
+        end
+    end)
+    slider:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+
+    return slider
+end
+
 function SettingsModule:Init()
     local panel = CreateFrame("Frame", "ClearLootSettingsPanel", UIParent)
     panel.name = "|TInterface\\Buttons\\UI-GroupLoot-Dice-Up:16:16:0:0|t ClearLoot"
@@ -64,150 +245,84 @@ function SettingsModule:Init()
     subtitle:SetJustifyH("LEFT")
     subtitle:SetText(L.ADDON_SUBTITLE)
 
-    local y = -68
+    local y = -66
 
     CreateCheckbox(panel, L.SETTINGS_ENABLE, L.SETTINGS_ENABLE_DESC, "enabled", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 32
+    y = y - 30
 
     CreateCheckbox(panel, L.SETTINGS_AUTO_OPEN, L.SETTINGS_AUTO_OPEN_DESC, "autoOpen", y)
-    y = y - 32
+    y = y - 30
 
     CreateCheckbox(panel, L.SETTINGS_SHOW_ROLE, L.SETTINGS_SHOW_ROLE_DESC, "showRoleIcons", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 32
+    y = y - 30
 
     CreateCheckbox(panel, L.SETTINGS_AUTO_SWITCH, L.SETTINGS_AUTO_SWITCH_DESC, "autoSwitchOnHover", y)
-    y = y - 32
+    y = y - 30
 
     CreateCheckbox(panel, L.SETTINGS_KEEP_AFTER_ROLL, L.SETTINGS_KEEP_AFTER_ROLL_DESC, "keepOpenAfterMyRoll", y)
-    y = y - 32
+    y = y - 30
 
     CreateCheckbox(panel, L.SETTINGS_HIDE_PASS, L.SETTINGS_HIDE_PASS_DESC, "hidePassed", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 32
+    y = y - 30
 
     CreateCheckbox(panel, L.SETTINGS_HIDE_PENDING, L.SETTINGS_HIDE_PENDING_DESC, "hidePending", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 40
+    y = y - 38
 
-    -- Window Anchor Dropdown
-    local anchorLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    anchorLabel:SetPoint("TOPLEFT", 20, y)
-    anchorLabel:SetText(L.SETTINGS_ANCHOR_SIDE)
+    -- Row 1: Choice Column Display (Left) & Window Anchor Position (Right)
+    local CHOICE_OPTIONS = {
+        { value = "ICONS", text = L.SETTINGS_CHOICE_ICONS },
+        { value = "TEXT",  text = L.SETTINGS_CHOICE_TEXT },
+        { value = "BOTH",  text = L.SETTINGS_CHOICE_BOTH },
+    }
+    CreateDropdown(panel, "ClearLootChoiceDropDown", L.SETTINGS_CHOICE_DISPLAY, 20, y, 210, CHOICE_OPTIONS, "choiceDisplay", "ICONS", function()
+        if ns.RollTrackerFrame then
+            ns.RollTrackerFrame:Refresh()
+        end
+    end)
 
     local ANCHOR_OPTIONS = {
         { value = "RIGHT", text = L.SETTINGS_ANCHOR_RIGHT },
         { value = "LEFT",  text = L.SETTINGS_ANCHOR_LEFT },
         { value = "FREE",  text = L.SETTINGS_ANCHOR_FREE },
     }
-
-    local function GetAnchorText(val)
-        for _, opt in ipairs(ANCHOR_OPTIONS) do
-            if opt.value == val then return opt.text end
+    local _, UpdateAnchorDisplay = CreateDropdown(panel, "ClearLootAnchorDropDown", L.SETTINGS_ANCHOR_SIDE, 290, y, 220, ANCHOR_OPTIONS, "anchorSide", "RIGHT", function()
+        if ns.MultiItemManager then
+            ns.MultiItemManager:UpdateAnchoring()
         end
-        return L.SETTINGS_ANCHOR_RIGHT
-    end
+    end)
 
-    local anchorWidget
-    local UpdateAnchorDisplay
+    y = y - 58
 
-    local hasLegacyDropdown = (not DoesTemplateExist or DoesTemplateExist("UIDropDownMenuTemplate"))
-        and type(UIDropDownMenu_SetWidth) == "function"
-        and type(UIDropDownMenu_Initialize) == "function"
-
-    if hasLegacyDropdown then
-        local dropdown = CreateFrame("Frame", "ClearLootAnchorDropDown", panel, "UIDropDownMenuTemplate")
-        dropdown:SetPoint("TOPLEFT", anchorLabel, "BOTTOMLEFT", -16, -4)
-
-        UpdateAnchorDisplay = function(val)
-            UIDropDownMenu_SetText(dropdown, GetAnchorText(val))
+    -- Row 2: Move Window & Reset Position Buttons
+    local moveWinBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    moveWinBtn:SetSize(165, 24)
+    moveWinBtn:SetPoint("TOPLEFT", 20, y)
+    moveWinBtn:SetText(L.SETTINGS_MOVE_BTN)
+    moveWinBtn:SetScript("OnClick", function()
+        if ns.RollTrackerFrame and ns.RollTrackerFrame.ToggleMoveMode then
+            ns.RollTrackerFrame:ToggleMoveMode()
         end
-
-        UIDropDownMenu_SetWidth(dropdown, 220)
-        UIDropDownMenu_Initialize(dropdown, function(self, level)
-            for _, opt in ipairs(ANCHOR_OPTIONS) do
-                local info = UIDropDownMenu_CreateInfo()
-                info.text = opt.text
-                info.value = opt.value
-                info.checked = (ns.db.anchorSide == opt.value)
-                info.func = function()
-                    ns.db.anchorSide = opt.value
-                    UpdateAnchorDisplay(opt.value)
-                    if ns.MultiItemManager then
-                        ns.MultiItemManager:UpdateAnchoring()
-                    end
-                end
-                UIDropDownMenu_AddButton(info, level)
-            end
-        end)
-
-        dropdown:SetScript("OnShow", function()
-            UpdateAnchorDisplay(ns.db.anchorSide)
-        end)
-        anchorWidget = dropdown
-    else
-        local anchorBtn = CreateFrame("Button", "ClearLootAnchorButton", panel, "UIPanelButtonTemplate")
-        anchorBtn:SetSize(240, 24)
-        anchorBtn:SetPoint("TOPLEFT", anchorLabel, "BOTTOMLEFT", 0, -6)
-
-        UpdateAnchorDisplay = function(val)
-            anchorBtn:SetText(GetAnchorText(val))
-        end
-
-        anchorBtn:SetScript("OnShow", function()
-            UpdateAnchorDisplay(ns.db.anchorSide)
-        end)
-
-        anchorBtn:SetScript("OnClick", function(self)
-            if MenuUtil and type(MenuUtil.CreateContextMenu) == "function" then
-                MenuUtil.CreateContextMenu(self, function(_, rootDescription)
-                    for _, opt in ipairs(ANCHOR_OPTIONS) do
-                        rootDescription:CreateRadio(opt.text, function()
-                            return ns.db.anchorSide == opt.value
-                        end, function()
-                            ns.db.anchorSide = opt.value
-                            UpdateAnchorDisplay(opt.value)
-                            if ns.MultiItemManager then
-                                ns.MultiItemManager:UpdateAnchoring()
-                            end
-                        end)
-                    end
-                end)
-            else
-                local nextIdx = 1
-                for idx, opt in ipairs(ANCHOR_OPTIONS) do
-                    if opt.value == ns.db.anchorSide then
-                        nextIdx = (idx % #ANCHOR_OPTIONS) + 1
-                        break
-                    end
-                end
-                local chosen = ANCHOR_OPTIONS[nextIdx]
-                ns.db.anchorSide = chosen.value
-                UpdateAnchorDisplay(chosen.value)
-                if ns.MultiItemManager then
-                    ns.MultiItemManager:UpdateAnchoring()
-                end
-            end
-        end)
-        anchorWidget = anchorBtn
-    end
+    end)
 
     local resetPosBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    resetPosBtn:SetSize(160, 24)
-    resetPosBtn:SetPoint("LEFT", anchorWidget, "RIGHT", hasLegacyDropdown and 0 or 10, hasLegacyDropdown and 2 or 0)
+    resetPosBtn:SetSize(165, 24)
+    resetPosBtn:SetPoint("LEFT", moveWinBtn, "RIGHT", 10, 0)
     resetPosBtn:SetText(L.SETTINGS_RESET_POS_BTN)
     resetPosBtn:SetScript("OnClick", function()
         ns.db.freePosition = nil
@@ -219,94 +334,55 @@ function SettingsModule:Init()
         ns:Print(L.MSG_POS_RESET)
     end)
 
-    y = y - 64
+    y = y - 38
 
-    -- Window Opacity Slider (pure-Lua Slider, no deprecated XML template dependency)
-    local opacityLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    opacityLabel:SetPoint("TOPLEFT", 20, y)
-
-    local opacitySlider = CreateFrame("Slider", "ClearLootOpacitySlider", panel, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    opacitySlider:SetSize(220, 16)
-    opacitySlider:SetPoint("TOPLEFT", opacityLabel, "BOTTOMLEFT", 0, -8)
-    opacitySlider:SetOrientation("HORIZONTAL")
-    opacitySlider:SetMinMaxValues(20, 100)
-    opacitySlider:SetValueStep(5)
-    if opacitySlider.SetObeyStepOnDrag then
-        opacitySlider:SetObeyStepOnDrag(true)
-    end
-
-    if opacitySlider.SetBackdrop then
-        opacitySlider:SetBackdrop({
-            bgFile = "Interface\\Buttons\\WHITE8X8",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            edgeSize = 8,
-            insets = { left = 2, right = 2, top = 2, bottom = 2 },
-        })
-        opacitySlider:SetBackdropColor(0.08, 0.08, 0.10, 0.85)
-        opacitySlider:SetBackdropBorderColor(0.6, 0.5, 0.3, 0.9)
-    else
-        local sliderBg = opacitySlider:CreateTexture(nil, "BACKGROUND")
-        sliderBg:SetAllPoints(opacitySlider)
-        sliderBg:SetColorTexture(0.08, 0.08, 0.10, 0.85)
-    end
-
-    local sliderThumb = opacitySlider:CreateTexture(nil, "ARTWORK")
-    sliderThumb:SetSize(14, 20)
-    sliderThumb:SetTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
-    opacitySlider:SetThumbTexture(sliderThumb)
-
-    local minLabel = opacitySlider:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    minLabel:SetPoint("TOPLEFT", opacitySlider, "BOTTOMLEFT", 0, -2)
-    minLabel:SetText("20%")
-
-    local maxLabel = opacitySlider:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    maxLabel:SetPoint("TOPRIGHT", opacitySlider, "BOTTOMRIGHT", 0, -2)
-    maxLabel:SetText("100%")
-
-    local function UpdateOpacityLabel(val)
-        opacityLabel:SetText(string.format("%s: |cffffffff%d%%|r", L.SETTINGS_OPACITY, val))
-    end
-
-    opacitySlider:SetScript("OnShow", function(self)
-        local val = (ns.db and tonumber(ns.db.windowOpacity)) or 100
-        self._updating = true
-        self:SetValue(val)
-        self._updating = false
-        UpdateOpacityLabel(val)
-    end)
-
-    opacitySlider:SetScript("OnValueChanged", function(self, value)
-        local rounded = math.floor(((value or 100) / 5) + 0.5) * 5
-        if rounded < 20 then rounded = 20 end
-        if rounded > 100 then rounded = 100 end
-        UpdateOpacityLabel(rounded)
-        if self._updating then return end
-        ns.db.windowOpacity = rounded
-        if ns.RollTrackerFrame and ns.RollTrackerFrame.UpdateOpacity then
-            ns.RollTrackerFrame:UpdateOpacity()
+    -- Row 3: Window Opacity Slider (Left) & Window Scale Slider (Right)
+    CreatePercentSlider(
+        panel,
+        "ClearLootOpacitySlider",
+        L.SETTINGS_OPACITY,
+        L.SETTINGS_OPACITY_DESC,
+        20,
+        y,
+        20,
+        100,
+        5,
+        "windowOpacity",
+        100,
+        function()
+            if ns.RollTrackerFrame and ns.RollTrackerFrame.UpdateOpacity then
+                ns.RollTrackerFrame:UpdateOpacity()
+            end
         end
-    end)
+    )
 
-    opacitySlider:SetScript("OnEnter", function(self)
-        if L.SETTINGS_OPACITY_DESC then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(L.SETTINGS_OPACITY, 1, 0.82, 0)
-            GameTooltip:AddLine(L.SETTINGS_OPACITY_DESC, 0.85, 0.85, 0.85, true)
-            GameTooltip:Show()
+    CreatePercentSlider(
+        panel,
+        "ClearLootScaleSlider",
+        L.SETTINGS_SCALE,
+        L.SETTINGS_SCALE_DESC,
+        290,
+        y,
+        60,
+        160,
+        5,
+        "windowScale",
+        100,
+        function()
+            if ns.RollTrackerFrame and ns.RollTrackerFrame.UpdateScale then
+                ns.RollTrackerFrame:UpdateScale()
+            end
         end
-    end)
-    opacitySlider:SetScript("OnLeave", function()
-        GameTooltip:Hide()
-    end)
+    )
 
-    y = y - 62
+    y = y - 60
 
-    -- Solo Testing & Simulation Section
+    -- Row 4: Solo Testing & Simulation Section
     local testHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     testHeader:SetPoint("TOPLEFT", 20, y)
     testHeader:SetText(L.SETTINGS_TEST_HEADER)
 
-    y = y - 24
+    y = y - 22
 
     local testSingleBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     testSingleBtn:SetSize(165, 26)

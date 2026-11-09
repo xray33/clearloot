@@ -5,7 +5,9 @@ local DataTracker = ns.DataTracker
 local RollTrackerFrame = {}
 ns.RollTrackerFrame = RollTrackerFrame
 
-local WINDOW_WIDTH = 336
+local WINDOW_WIDTH_ICONS = 324
+local WINDOW_WIDTH_TEXT  = 360
+local WINDOW_WIDTH_BOTH  = 378
 local HEADER_HEIGHT = 56
 local FOOTER_HEIGHT = 26
 local ROW_HEIGHT = 20
@@ -18,8 +20,25 @@ local ROLL_ICONS = {
     [DataTracker.ROLL_TYPE_GREED]      = "Interface\\Buttons\\UI-GroupLoot-Coin-Up",
     [DataTracker.ROLL_TYPE_DISENCHANT] = "Interface\\Buttons\\UI-GroupLoot-DE-Up",
     [DataTracker.ROLL_TYPE_PASS]       = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
-    [DataTracker.ROLL_TYPE_PENDING]    = "Interface\\FriendsFrame\\StatusIcon-Away",
 }
+
+function RollTrackerFrame:GetChoiceDisplayMode()
+    local mode = ns.db and ns.db.choiceDisplay or "ICONS"
+    if mode ~= "ICONS" and mode ~= "TEXT" and mode ~= "BOTH" then
+        mode = "ICONS"
+    end
+    return mode
+end
+
+function RollTrackerFrame:GetWindowWidth()
+    local mode = self:GetChoiceDisplayMode()
+    if mode == "TEXT" then
+        return WINDOW_WIDTH_TEXT
+    elseif mode == "BOTH" then
+        return WINDOW_WIDTH_BOTH
+    end
+    return WINDOW_WIDTH_ICONS
+end
 
 local ROLL_COLORS = {
     [DataTracker.ROLL_TYPE_NEED]       = { r = 0.20, g = 1.00, b = 0.20 },
@@ -242,7 +261,7 @@ end
 
 local function CreatePlayerRow(parent, index)
     local row = CreateFrame("Button", nil, parent)
-    row:SetSize(WINDOW_WIDTH - 24, ROW_HEIGHT)
+    row:SetSize(WINDOW_WIDTH_ICONS - 24, ROW_HEIGHT)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row.rowIndex = index
 
@@ -279,7 +298,7 @@ local function CreatePlayerRow(parent, index)
     -- 3. Player Name (Class Colored)
     local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     nameText:SetPoint("LEFT", classIcon, "RIGHT", 5, 0)
-    nameText:SetWidth(124)
+    nameText:SetWidth(156)
     nameText:SetJustifyH("LEFT")
     nameText:SetWordWrap(false)
     row.nameText = nameText
@@ -291,10 +310,10 @@ local function CreatePlayerRow(parent, index)
     roleIcon:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES")
     row.roleIcon = roleIcon
 
-    -- 5. Roll Choice Icon (Dice / Coin / DE / Pass / Pending)
+    -- 5. Roll Choice Icon (Dice / Coin / DE / Pass)
     local choiceIcon = row:CreateTexture(nil, "ARTWORK")
-    choiceIcon:SetSize(15, 15)
-    choiceIcon:SetPoint("LEFT", roleIcon, "RIGHT", 5, 0)
+    choiceIcon:SetSize(16, 16)
+    choiceIcon:SetPoint("LEFT", row, "LEFT", 235, 0)
     row.choiceIcon = choiceIcon
 
     -- 6. Roll Choice Text ("Need", "Greed", "Pass")
@@ -367,7 +386,7 @@ end
 
 function RollTrackerFrame:Init()
     local frame = CreateFrame("Frame", "ClearLootTrackerFrame", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    frame:SetSize(WINDOW_WIDTH, HEADER_HEIGHT + (MIN_VISIBLE_ROWS * ROW_HEIGHT) + FOOTER_HEIGHT)
+    frame:SetSize(self:GetWindowWidth(), HEADER_HEIGHT + (MIN_VISIBLE_ROWS * ROW_HEIGHT) + FOOTER_HEIGHT)
     frame:SetFrameStrata("FULLSCREEN_DIALOG")
     frame:SetToplevel(true)
     frame:SetClampedToScreen(true)
@@ -384,9 +403,7 @@ function RollTrackerFrame:Init()
     end)
 
     frame:SetScript("OnDragStart", function(self)
-        if ns.db.anchorSide == "FREE" or IsShiftKeyDown() then
-            self:StartMoving()
-        end
+        self:StartMoving()
     end)
 
     frame:SetScript("OnDragStop", function(self)
@@ -503,9 +520,12 @@ function RollTrackerFrame:Init()
     hName:SetTextColor(0.85, 0.75, 0.45)
 
     local hChoice = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hChoice:SetPoint("LEFT", 189, 0)
+    hChoice:SetPoint("LEFT", 222, 0)
+    hChoice:SetWidth(42)
+    hChoice:SetJustifyH("CENTER")
     hChoice:SetText(L.HEADER_CHOICE)
     hChoice:SetTextColor(0.85, 0.75, 0.45)
+    frame.hChoice = hChoice
 
     local hRoll = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     hRoll:SetPoint("RIGHT", -4, 0)
@@ -582,9 +602,55 @@ function RollTrackerFrame:Init()
     footerText:SetTextColor(0.85, 0.78, 0.55)
     frame.footerText = footerText
 
+    -- Edit Mode / Move Mode Overlay (shown during Blizzard Edit Mode or /cl move)
+    local moverOverlay = CreateFrame("Frame", "ClearLootMoverOverlay", frame, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    moverOverlay:SetAllPoints(frame)
+    moverOverlay:SetFrameLevel(frame:GetFrameLevel() + 20)
+    moverOverlay:EnableMouse(true)
+    moverOverlay:RegisterForDrag("LeftButton")
+    if moverOverlay.SetBackdrop then
+        moverOverlay:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            edgeSize = 14,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 },
+        })
+        moverOverlay:SetBackdropColor(0.04, 0.28, 0.65, 0.86)
+        moverOverlay:SetBackdropBorderColor(0.35, 0.80, 1.00, 1.0)
+    else
+        local moverBg = moverOverlay:CreateTexture(nil, "BACKGROUND")
+        moverBg:SetAllPoints(moverOverlay)
+        moverBg:SetColorTexture(0.04, 0.28, 0.65, 0.86)
+    end
+
+    local moverLabel = moverOverlay:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    moverLabel:SetPoint("CENTER", moverOverlay, "CENTER", 0, 12)
+    moverLabel:SetText(L.EDIT_MODE_LABEL or "Clear Loot\nDrag to Move")
+    moverLabel:SetTextColor(1.0, 0.92, 0.50)
+
+    local lockBtn = CreateFrame("Button", nil, moverOverlay, "UIPanelButtonTemplate")
+    lockBtn:SetSize(120, 24)
+    lockBtn:SetPoint("BOTTOM", moverOverlay, "BOTTOM", 0, 14)
+    lockBtn:SetText(L.EDIT_MODE_LOCK_BTN or "Lock Window")
+    lockBtn:SetScript("OnClick", function()
+        RollTrackerFrame:SetMoveMode(false, false)
+    end)
+    moverOverlay.lockBtn = lockBtn
+
+    moverOverlay:SetScript("OnDragStart", function()
+        frame:GetScript("OnDragStart")(frame)
+    end)
+    moverOverlay:SetScript("OnDragStop", function()
+        frame:GetScript("OnDragStop")(frame)
+    end)
+    moverOverlay:Hide()
+    frame.moverOverlay = moverOverlay
+
     frame:Hide()
     self.frame = frame
     self:UpdateOpacity()
+    self:UpdateScale()
+    self:HookBlizzardEditMode()
 end
 
 function RollTrackerFrame:UpdateOpacity()
@@ -593,6 +659,79 @@ function RollTrackerFrame:UpdateOpacity()
     if pct < 20 then pct = 20 end
     if pct > 100 then pct = 100 end
     self.frame:SetAlpha(pct / 100)
+end
+
+function RollTrackerFrame:UpdateScale()
+    if not self.frame then return end
+    local pct = (ns.db and tonumber(ns.db.windowScale)) or 100
+    if pct < 60 then pct = 60 end
+    if pct > 160 then pct = 160 end
+    self.frame:SetScale(pct / 100)
+end
+
+function RollTrackerFrame:SetMoveMode(active, fromBlizzardEditMode)
+    local frame = self.frame
+    if not frame or not frame.moverOverlay then return end
+
+    self.isMoveMode = active and true or false
+    if self.isMoveMode then
+        if ns.MultiItemManager and frame:GetNumPoints() == 0 then
+            ns.MultiItemManager:UpdateAnchoring()
+        end
+        frame:SetWidth(self:GetWindowWidth())
+        if fromBlizzardEditMode then
+            frame.moverOverlay.lockBtn:Hide()
+        else
+            frame.moverOverlay.lockBtn:Show()
+        end
+        frame.moverOverlay:Show()
+        frame:Show()
+        if frame.Raise then
+            frame:Raise()
+        end
+    else
+        frame.moverOverlay:Hide()
+        self:Refresh()
+    end
+end
+
+function RollTrackerFrame:ToggleMoveMode()
+    self:SetMoveMode(not self.isMoveMode, false)
+end
+
+function RollTrackerFrame:HookBlizzardEditMode()
+    if self._editModeHooked then return end
+    self._editModeHooked = true
+
+    if EventRegistry and type(EventRegistry.RegisterCallback) == "function" then
+        pcall(function()
+            EventRegistry:RegisterCallback("EditMode.Enter", function()
+                RollTrackerFrame:SetMoveMode(true, true)
+            end, RollTrackerFrame)
+            EventRegistry:RegisterCallback("EditMode.Exit", function()
+                RollTrackerFrame:SetMoveMode(false, true)
+            end, RollTrackerFrame)
+        end)
+    end
+
+    local function HookManagerFrame()
+        if _G.EditModeManagerFrame and not _G.EditModeManagerFrame._clearLootHooked then
+            _G.EditModeManagerFrame._clearLootHooked = true
+            _G.EditModeManagerFrame:HookScript("OnShow", function()
+                RollTrackerFrame:SetMoveMode(true, true)
+            end)
+            _G.EditModeManagerFrame:HookScript("OnHide", function()
+                RollTrackerFrame:SetMoveMode(false, true)
+            end)
+        end
+    end
+
+    HookManagerFrame()
+    ns:RegisterEvent("ADDON_LOADED", function(_, loadedName)
+        if loadedName == "Blizzard_EditMode" then
+            HookManagerFrame()
+        end
+    end)
 end
 
 function RollTrackerFrame:HideWindow()
@@ -680,9 +819,26 @@ function RollTrackerFrame:UpdatePlayerRows()
     local numPlayers = #players
     local visibleRows = math.min(MAX_VISIBLE_ROWS, math.max(MIN_VISIBLE_ROWS, numPlayers))
 
-    -- Adjust window height dynamically to fit party/raid size cleanly
+    -- Adjust window width & height dynamically to fit choice mode and party/raid size cleanly
+    local winWidth = self:GetWindowWidth()
     local targetHeight = HEADER_HEIGHT + (visibleRows * ROW_HEIGHT) + FOOTER_HEIGHT
-    frame:SetHeight(targetHeight)
+    frame:SetSize(winWidth, targetHeight)
+
+    local choiceMode = self:GetChoiceDisplayMode()
+    if frame.hChoice then
+        frame.hChoice:ClearAllPoints()
+        frame.hChoice:SetPoint("LEFT", 222, 0)
+        if choiceMode == "ICONS" then
+            frame.hChoice:SetWidth(42)
+            frame.hChoice:SetJustifyH("CENTER")
+        elseif choiceMode == "TEXT" then
+            frame.hChoice:SetWidth(78)
+            frame.hChoice:SetJustifyH("LEFT")
+        else
+            frame.hChoice:SetWidth(96)
+            frame.hChoice:SetJustifyH("LEFT")
+        end
+    end
 
     local maxOffset = math.max(0, numPlayers - visibleRows)
     frame.maxScrollOffset = maxOffset
@@ -708,7 +864,7 @@ function RollTrackerFrame:UpdatePlayerRows()
         end
     end
 
-    local rowWidth = hasScrollbar and (WINDOW_WIDTH - 34) or (WINDOW_WIDTH - 20)
+    local rowWidth = hasScrollbar and (winWidth - 34) or (winWidth - 20)
     local leaders = self.currentEval.leaders or {}
     local isLeaderMap = {}
     for _, l in ipairs(leaders) do
@@ -765,13 +921,50 @@ function RollTrackerFrame:UpdatePlayerRows()
                 row.roleIcon:Hide()
             end
 
-            -- 5. Roll Choice Icon & Text
-            local iconPath = ROLL_ICONS[p.rollType] or ROLL_ICONS[DataTracker.ROLL_TYPE_PENDING]
-            row.choiceIcon:SetTexture(iconPath)
-            row.choiceText:SetText(DataTracker:GetRollTypeLabel(p.rollType))
-
+            -- 5. Roll Choice Icon & Text (Icons / Text / Both; Pending shows nothing)
+            local iconPath = ROLL_ICONS[p.rollType]
             local rc = ROLL_COLORS[p.rollType] or ROLL_COLORS[DataTracker.ROLL_TYPE_PENDING]
-            row.choiceText:SetTextColor(rc.r, rc.g, rc.b)
+
+            if choiceMode == "ICONS" then
+                row.choiceText:Hide()
+                if iconPath then
+                    row.choiceIcon:ClearAllPoints()
+                    row.choiceIcon:SetPoint("CENTER", row, "LEFT", 243, 0)
+                    row.choiceIcon:SetTexture(iconPath)
+                    row.choiceIcon:Show()
+                else
+                    row.choiceIcon:Hide()
+                end
+            elseif choiceMode == "TEXT" then
+                row.choiceIcon:Hide()
+                if p.rollType ~= DataTracker.ROLL_TYPE_PENDING then
+                    row.choiceText:ClearAllPoints()
+                    row.choiceText:SetPoint("LEFT", row, "LEFT", 222, 0)
+                    row.choiceText:SetWidth(78)
+                    row.choiceText:SetText(DataTracker:GetRollTypeLabel(p.rollType))
+                    row.choiceText:SetTextColor(rc.r, rc.g, rc.b)
+                    row.choiceText:Show()
+                else
+                    row.choiceText:Hide()
+                end
+            else
+                if iconPath then
+                    row.choiceIcon:ClearAllPoints()
+                    row.choiceIcon:SetPoint("LEFT", row, "LEFT", 222, 0)
+                    row.choiceIcon:SetTexture(iconPath)
+                    row.choiceIcon:Show()
+
+                    row.choiceText:ClearAllPoints()
+                    row.choiceText:SetPoint("LEFT", row.choiceIcon, "RIGHT", 4, 0)
+                    row.choiceText:SetWidth(76)
+                    row.choiceText:SetText(DataTracker:GetRollTypeLabel(p.rollType))
+                    row.choiceText:SetTextColor(rc.r, rc.g, rc.b)
+                    row.choiceText:Show()
+                else
+                    row.choiceIcon:Hide()
+                    row.choiceText:Hide()
+                end
+            end
 
             -- 6. Roll Score
             if p.rollScore and p.rollScore > 0 then
@@ -801,19 +994,29 @@ function RollTrackerFrame:Refresh(isNewRoll)
     local frame = self.frame
     if not frame then return end
 
+    self:UpdateOpacity()
+    self:UpdateScale()
+    frame:SetWidth(self:GetWindowWidth())
+
     if not ns.db.enabled then
-        frame:Hide()
+        if not self.isMoveMode then
+            frame:Hide()
+        end
         return
     end
 
     local session = DataTracker:GetCurrentRollSession()
     if not session then
-        frame:Hide()
+        if not self.isMoveMode then
+            frame:Hide()
+        end
         return
     end
 
     if DataTracker:IsDismissed(session.rollID) then
-        frame:Hide()
+        if not self.isMoveMode then
+            frame:Hide()
+        end
         return
     end
 
@@ -846,7 +1049,6 @@ function RollTrackerFrame:Refresh(isNewRoll)
         end
     end
 
-    self:UpdateOpacity()
     self:UpdatePlayerRows()
     frame:Show()
     if frame.Raise then
