@@ -45,16 +45,32 @@ local function CreateCheckbox(parent, label, tooltip, dbKey, yOffset, onChange)
     return cb
 end
 
-local function CreateDropdown(parent, globalName, labelText, xOffset, yOffset, width, options, dbKey, defaultValue, onSelect)
+local function CreateDropdown(parent, globalName, labelText, tooltipText, xOffset, yOffset, width, options, dbKey, defaultValue, onSelect)
     local label = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     label:SetPoint("TOPLEFT", xOffset, yOffset)
     label:SetText(labelText)
+
+    local function GetCurrentVal()
+        if ns.db and ns.db[dbKey] ~= nil then
+            return ns.db[dbKey]
+        end
+        return defaultValue
+    end
 
     local function GetOptionText(val)
         for _, opt in ipairs(options) do
             if opt.value == val then return opt.text end
         end
         return options[1] and options[1].text or ""
+    end
+
+    local function ShowDropdownTooltip(owner)
+        if tooltipText then
+            GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+            GameTooltip:SetText(labelText, 1, 0.82, 0)
+            GameTooltip:AddLine(tooltipText, 0.85, 0.85, 0.85, true)
+            GameTooltip:Show()
+        end
     end
 
     local hasLegacyDropdown = (not DoesTemplateExist or DoesTemplateExist("UIDropDownMenuTemplate"))
@@ -67,6 +83,7 @@ local function CreateDropdown(parent, globalName, labelText, xOffset, yOffset, w
     if hasLegacyDropdown then
         local dropdown = CreateFrame("Frame", globalName, parent, "UIDropDownMenuTemplate")
         dropdown:SetPoint("TOPLEFT", label, "BOTTOMLEFT", -16, -4)
+        dropdown:EnableMouse(true)
 
         UpdateDisplay = function(val)
             UIDropDownMenu_SetText(dropdown, GetOptionText(val))
@@ -74,11 +91,12 @@ local function CreateDropdown(parent, globalName, labelText, xOffset, yOffset, w
 
         UIDropDownMenu_SetWidth(dropdown, width)
         UIDropDownMenu_Initialize(dropdown, function(self, level)
+            local curVal = GetCurrentVal()
             for _, opt in ipairs(options) do
                 local info = UIDropDownMenu_CreateInfo()
                 info.text = opt.text
                 info.value = opt.value
-                info.checked = ((ns.db[dbKey] or defaultValue) == opt.value)
+                info.checked = (curVal == opt.value)
                 info.func = function()
                     ns.db[dbKey] = opt.value
                     UpdateDisplay(opt.value)
@@ -91,8 +109,21 @@ local function CreateDropdown(parent, globalName, labelText, xOffset, yOffset, w
         end)
 
         dropdown:SetScript("OnShow", function()
-            UpdateDisplay(ns.db[dbKey] or defaultValue)
+            UpdateDisplay(GetCurrentVal())
         end)
+        dropdown:SetScript("OnEnter", ShowDropdownTooltip)
+        dropdown:SetScript("OnLeave", function()
+            GameTooltip:Hide()
+        end)
+        local ddButton = _G[globalName .. "Button"]
+        if ddButton then
+            ddButton:HookScript("OnEnter", function()
+                ShowDropdownTooltip(dropdown)
+            end)
+            ddButton:HookScript("OnLeave", function()
+                GameTooltip:Hide()
+            end)
+        end
         widget = dropdown
     else
         local btn = CreateFrame("Button", globalName .. "Button", parent, "UIPanelButtonTemplate")
@@ -104,7 +135,11 @@ local function CreateDropdown(parent, globalName, labelText, xOffset, yOffset, w
         end
 
         btn:SetScript("OnShow", function()
-            UpdateDisplay(ns.db[dbKey] or defaultValue)
+            UpdateDisplay(GetCurrentVal())
+        end)
+        btn:SetScript("OnEnter", ShowDropdownTooltip)
+        btn:SetScript("OnLeave", function()
+            GameTooltip:Hide()
         end)
 
         btn:SetScript("OnClick", function(self)
@@ -112,7 +147,7 @@ local function CreateDropdown(parent, globalName, labelText, xOffset, yOffset, w
                 MenuUtil.CreateContextMenu(self, function(_, rootDescription)
                     for _, opt in ipairs(options) do
                         rootDescription:CreateRadio(opt.text, function()
-                            return (ns.db[dbKey] or defaultValue) == opt.value
+                            return GetCurrentVal() == opt.value
                         end, function()
                             ns.db[dbKey] = opt.value
                             UpdateDisplay(opt.value)
@@ -123,7 +158,7 @@ local function CreateDropdown(parent, globalName, labelText, xOffset, yOffset, w
                     end
                 end)
             else
-                local cur = ns.db[dbKey] or defaultValue
+                local cur = GetCurrentVal()
                 local nextIdx = 1
                 for idx, opt in ipairs(options) do
                     if opt.value == cur then
@@ -245,74 +280,123 @@ function SettingsModule:Init()
     subtitle:SetJustifyH("LEFT")
     subtitle:SetText(L.ADDON_SUBTITLE)
 
-    local y = -66
+    local y = -64
 
     CreateCheckbox(panel, L.SETTINGS_ENABLE, L.SETTINGS_ENABLE_DESC, "enabled", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 30
+    y = y - 28
 
     CreateCheckbox(panel, L.SETTINGS_AUTO_OPEN, L.SETTINGS_AUTO_OPEN_DESC, "autoOpen", y)
-    y = y - 30
+    y = y - 28
 
     CreateCheckbox(panel, L.SETTINGS_SHOW_ROLE, L.SETTINGS_SHOW_ROLE_DESC, "showRoleIcons", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 30
+    y = y - 28
 
     CreateCheckbox(panel, L.SETTINGS_AUTO_SWITCH, L.SETTINGS_AUTO_SWITCH_DESC, "autoSwitchOnHover", y)
-    y = y - 30
+    y = y - 28
 
     CreateCheckbox(panel, L.SETTINGS_KEEP_AFTER_ROLL, L.SETTINGS_KEEP_AFTER_ROLL_DESC, "keepOpenAfterMyRoll", y)
-    y = y - 30
+    y = y - 28
 
     CreateCheckbox(panel, L.SETTINGS_HIDE_PASS, L.SETTINGS_HIDE_PASS_DESC, "hidePassed", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 30
+    y = y - 28
 
     CreateCheckbox(panel, L.SETTINGS_HIDE_PENDING, L.SETTINGS_HIDE_PENDING_DESC, "hidePending", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 38
+    y = y - 36
 
-    -- Row 1: Choice Column Display (Left) & Window Anchor Position (Right)
+    -- Row 1: Choice Column Display (Left) & Auto-Close Window (Right)
     local CHOICE_OPTIONS = {
         { value = "ICONS", text = L.SETTINGS_CHOICE_ICONS },
         { value = "TEXT",  text = L.SETTINGS_CHOICE_TEXT },
         { value = "BOTH",  text = L.SETTINGS_CHOICE_BOTH },
     }
-    CreateDropdown(panel, "ClearLootChoiceDropDown", L.SETTINGS_CHOICE_DISPLAY, 20, y, 210, CHOICE_OPTIONS, "choiceDisplay", "ICONS", function()
-        if ns.RollTrackerFrame then
-            ns.RollTrackerFrame:Refresh()
+    CreateDropdown(
+        panel,
+        "ClearLootChoiceDropDown",
+        L.SETTINGS_CHOICE_DISPLAY,
+        L.SETTINGS_CHOICE_DISPLAY_DESC,
+        20,
+        y,
+        210,
+        CHOICE_OPTIONS,
+        "choiceDisplay",
+        "ICONS",
+        function()
+            if ns.RollTrackerFrame then
+                ns.RollTrackerFrame:Refresh()
+            end
         end
-    end)
+    )
 
+    local AUTO_CLOSE_OPTIONS = {
+        { value = 3,  text = L.SETTINGS_AUTO_CLOSE_3S },
+        { value = 5,  text = L.SETTINGS_AUTO_CLOSE_5S },
+        { value = 10, text = L.SETTINGS_AUTO_CLOSE_10S },
+        { value = 15, text = L.SETTINGS_AUTO_CLOSE_15S },
+        { value = 0,  text = L.SETTINGS_AUTO_CLOSE_NEVER },
+    }
+    CreateDropdown(
+        panel,
+        "ClearLootAutoCloseDropDown",
+        L.SETTINGS_AUTO_CLOSE,
+        L.SETTINGS_AUTO_CLOSE_DESC,
+        290,
+        y,
+        210,
+        AUTO_CLOSE_OPTIONS,
+        "autoCloseDelay",
+        5,
+        function()
+            if ns.DataTracker and ns.DataTracker.TriggerAutoCloseForCompletedRolls then
+                ns.DataTracker:TriggerAutoCloseForCompletedRolls()
+            end
+        end
+    )
+
+    y = y - 56
+
+    -- Row 2: Window Anchor Position (Left) + Move Window & Reset Position Buttons (Right)
     local ANCHOR_OPTIONS = {
         { value = "RIGHT", text = L.SETTINGS_ANCHOR_RIGHT },
         { value = "LEFT",  text = L.SETTINGS_ANCHOR_LEFT },
         { value = "FREE",  text = L.SETTINGS_ANCHOR_FREE },
     }
-    local _, UpdateAnchorDisplay = CreateDropdown(panel, "ClearLootAnchorDropDown", L.SETTINGS_ANCHOR_SIDE, 290, y, 220, ANCHOR_OPTIONS, "anchorSide", "RIGHT", function()
-        if ns.MultiItemManager then
-            ns.MultiItemManager:UpdateAnchoring()
+    local _, UpdateAnchorDisplay = CreateDropdown(
+        panel,
+        "ClearLootAnchorDropDown",
+        L.SETTINGS_ANCHOR_SIDE,
+        L.SETTINGS_ANCHOR_SIDE_DESC,
+        20,
+        y,
+        210,
+        ANCHOR_OPTIONS,
+        "anchorSide",
+        "RIGHT",
+        function()
+            if ns.MultiItemManager then
+                ns.MultiItemManager:UpdateAnchoring()
+            end
         end
-    end)
+    )
 
-    y = y - 58
-
-    -- Row 2: Move Window & Reset Position Buttons
     local moveWinBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    moveWinBtn:SetSize(165, 24)
-    moveWinBtn:SetPoint("TOPLEFT", 20, y)
+    moveWinBtn:SetSize(130, 24)
+    moveWinBtn:SetPoint("TOPLEFT", 290, y - 18)
     moveWinBtn:SetText(L.SETTINGS_MOVE_BTN)
     moveWinBtn:SetScript("OnClick", function()
         if ns.RollTrackerFrame and ns.RollTrackerFrame.ToggleMoveMode then
@@ -321,8 +405,8 @@ function SettingsModule:Init()
     end)
 
     local resetPosBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    resetPosBtn:SetSize(165, 24)
-    resetPosBtn:SetPoint("LEFT", moveWinBtn, "RIGHT", 10, 0)
+    resetPosBtn:SetSize(130, 24)
+    resetPosBtn:SetPoint("LEFT", moveWinBtn, "RIGHT", 8, 0)
     resetPosBtn:SetText(L.SETTINGS_RESET_POS_BTN)
     resetPosBtn:SetScript("OnClick", function()
         ns.db.freePosition = nil
@@ -334,7 +418,7 @@ function SettingsModule:Init()
         ns:Print(L.MSG_POS_RESET)
     end)
 
-    y = y - 38
+    y = y - 58
 
     -- Row 3: Window Opacity Slider (Left) & Window Scale Slider (Right)
     CreatePercentSlider(

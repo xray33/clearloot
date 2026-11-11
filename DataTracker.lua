@@ -82,6 +82,20 @@ local function BuildChatPatterns()
     AddGlobal("LOOT_ROLL_DISENCHANT_SELF", DataTracker.ROLL_TYPE_DISENCHANT, { "item" }, true)
     AddGlobal("LOOT_ROLL_PASSED_SELF", DataTracker.ROLL_TYPE_PASS, { "item" }, true)
     AddGlobal("LOOT_ROLL_PASSED_SELF_AUTO", DataTracker.ROLL_TYPE_PASS, { "item" }, true)
+
+    -- Winner / completion announcements (e.g. "Player won: [Item]", "You won: [Item]", "Everyone passed on: [Item]")
+    local function AddCompletionGlobal(globalName, order, isSelf)
+        local raw = _G[globalName]
+        local entry = CreatePatternFromGlobalString(raw, order)
+        if entry then
+            entry.isCompletion = true
+            entry.isSelf = isSelf
+            table.insert(chatPatterns, entry)
+        end
+    end
+    AddCompletionGlobal("LOOT_ROLL_WON", { "player", "item" }, false)
+    AddCompletionGlobal("LOOT_ROLL_YOU_WON", { "item" }, true)
+    AddCompletionGlobal("LOOT_ROLL_ALL_PASSED", { "item" }, false)
 end
 
 function DataTracker:GetRollTypeLabel(rollType)
@@ -120,16 +134,97 @@ end
 function DataTracker:UndismissRoll(rollID)
     if not rollID then return end
     dismissedRolls[rollID] = nil
+    local session = rollsByID[rollID]
+    if session then
+        session.manualShow = true
+    end
+end
+
+function DataTracker:ScheduleAutoClose(rollID)
+    if not rollID or rollID ~= currentRollID then return end
+    local session = rollsByID[rollID]
+    if not session or session.manualShow then return end
+
+    local delay = ns.db and tonumber(ns.db.autoCloseDelay)
+    if delay == nil then
+        delay = 5
+    end
+    if delay <= 0 then
+        return
+    end
+
+    if not session.completedAt then
+        session.completedAt = GetTime()
+    end
+
+    local elapsed = GetTime() - session.completedAt
+    local remaining = math.max(0.1, delay - elapsed)
+
+    session._autoCloseGen = (session._autoCloseGen or 0) + 1
+    local gen = session._autoCloseGen
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(remaining, function()
+            if currentRollID ~= rollID then
+                return
+            end
+            local s = rollsByID[rollID]
+            if not s or s._autoCloseGen ~= gen or s.manualShow or dismissedRolls[rollID] then
+                return
+            end
+            local curDelay = ns.db and tonumber(ns.db.autoCloseDelay)
+            if curDelay == nil then curDelay = 5 end
+            if curDelay <= 0 then
+                return
+            end
+            if s.completedAt and (GetTime() - s.completedAt) >= (curDelay - 0.05) then
+                self:DismissRoll(rollID)
+            end
+        end)
+    end
+end
+
+function DataTracker:TriggerAutoCloseForCompletedRolls()
+    local session = self:GetCurrentRollSession()
+    if session and not session.isClosed and not dismissedRolls[session.rollID] then
+        local eval = self:EvaluateSession(session)
+        if eval and eval.isComplete then
+            session.manualShow = false
+            session.completedAt = GetTime()
+            self:ScheduleAutoClose(session.rollID)
+        end
+    end
 end
 
 function DataTracker:GetNextVisibleRollID(excludeRollID)
-    for i = #activeRollOrder, 1, -1 do
+    local foundExcluded = false
+    local firstAvailable = nil
+
+    for i = 1, #activeRollOrder do
         local id = activeRollOrder[i]
-        if id ~= excludeRollID and not dismissedRolls[id] then
+        if id == excludeRollID then
+            foundExcluded = true
+        elseif not dismissedRolls[id] then
             local session = rollsByID[id]
             if session and not session.isClosed then
-                return id
+                if foundExcluded then
+                    return id
+                end
+                if not firstAvailable then
+                    firstAvailable = id
+                end
             end
+        end
+    end
+    return firstAvailable
+end
+
+function DataTracker:GetLastRollID()
+    for i = #activeRollOrder, 1, -1 do
+        local id = activeRollOrder[i]
+        local session = rollsByID[id]
+        if session and not session.isClosed then
+            return id
         end
     end
     return nil
@@ -140,7 +235,7 @@ function DataTracker:GetActiveRolls()
     for i = 1, #activeRollOrder do
         local id = activeRollOrder[i]
         local session = rollsByID[id]
-        if session and not session.isClosed then
+        if session and not session.isClosed and not dismissedRolls[id] then
             table.insert(list, session)
         end
     end
@@ -152,7 +247,7 @@ function DataTracker:GetRollSession(rollID)
 end
 
 function DataTracker:GetCurrentRollSession()
-    if currentRollID and rollsByID[currentRollID] and not rollsByID[currentRollID].isClosed then
+    if currentRollID and rollsByID[currentRollID] and not rollsByID[currentRollID].isClosed and not dismissedRolls[currentRollID] then
         return rollsByID[currentRollID]
     end
     local fallbackID = self:GetNextVisibleRollID()
@@ -165,9 +260,16 @@ end
 
 function DataTracker:SetCurrentRollID(rollID, forceShow)
     if not rollID or not rollsByID[rollID] then return end
+    local changed = (currentRollID ~= rollID)
     currentRollID = rollID
+    local session = rollsByID[rollID]
     if forceShow then
         dismissedRolls[rollID] = nil
+    end
+    if changed and session and session.completedAt then
+        -- Give the newly focused tab a fresh auto-close countdown so the player has time to read it
+        session.completedAt = GetTime()
+        self:ScheduleAutoClose(rollID)
     end
     self:NotifyUI()
 end
@@ -349,7 +451,28 @@ function DataTracker:EvaluateSession(session)
     end
 
     local pendingCount = math.max(0, totalPlayers - answeredPlayers)
-    local isComplete = session.isDone or (totalPlayers > 0 and pendingCount == 0)
+    local allScoresIn = true
+    for _, p in ipairs(sortedPlayers) do
+        if p.rollType == self.ROLL_TYPE_PENDING then
+            allScoresIn = false
+            break
+        elseif (p.rollType == self.ROLL_TYPE_NEED or p.rollType == self.ROLL_TYPE_GREED or p.rollType == self.ROLL_TYPE_DISENCHANT) and not p.rollScore then
+            allScoresIn = false
+            break
+        end
+    end
+    local isComplete = session.isDone or (totalPlayers > 0 and pendingCount == 0 and allScoresIn)
+
+    if isComplete then
+        if session.rollID == currentRollID then
+            if not session.completedAt then
+                session.completedAt = GetTime()
+                self:ScheduleAutoClose(session.rollID)
+            end
+        end
+    else
+        session.completedAt = nil
+    end
 
     return {
         players = sortedPlayers,
@@ -573,6 +696,21 @@ function DataTracker:OnChatMsgLoot(msg)
             end
             local itemLink = parsed.item
             local rollScore = parsed.roll and tonumber(parsed.roll) or nil
+
+            if entry.isCompletion and itemLink then
+                for i = #activeRollOrder, 1, -1 do
+                    local id = activeRollOrder[i]
+                    local session = rollsByID[id]
+                    if session and not session.isSimulated and not session.isClosed then
+                        if session.itemLink == itemLink or (session.itemName and itemLink:find(session.itemName, 1, true)) then
+                            session.isDone = true
+                            self:NotifyUI()
+                            break
+                        end
+                    end
+                end
+                return
+            end
 
             if playerName and itemLink then
                 -- Match to the most recent active roll session for this itemLink

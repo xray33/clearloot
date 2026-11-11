@@ -743,10 +743,10 @@ end
 function RollTrackerFrame:ForceShowCurrent()
     local session = DataTracker:GetCurrentRollSession()
     if not session then
-        local active = DataTracker:GetActiveRolls()
-        if #active > 0 then
-            session = active[#active]
-            DataTracker:SetCurrentRollID(session.rollID, true)
+        local lastID = DataTracker.GetLastRollID and DataTracker:GetLastRollID()
+        if lastID then
+            DataTracker:UndismissRoll(lastID)
+            DataTracker:SetCurrentRollID(lastID, true)
             return
         end
     else
