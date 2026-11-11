@@ -19,6 +19,7 @@ local DEFAULT_SETTINGS = {
     hidePassed = false,
     hidePending = false,
     choiceDisplay = "ICONS", -- "ICONS", "TEXT", or "BOTH"
+    autoCloseDelay = 5,      -- 3, 5, 10, 15 (seconds), or 0 (Never)
     windowOpacity = 100,     -- 20..100 (%)
     windowScale = 100,       -- 60..160 (%)
     anchorSide = "RIGHT",    -- "RIGHT", "LEFT", or "FREE"
