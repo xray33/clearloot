@@ -31,22 +31,37 @@ local currentRollID = nil
 
 local chatPatterns = {}
 
--- Convert a Blizzard format string (e.g. LOOT_ROLL_ROLLED_NEED = "%s rolls %d (%s)" or "%1$s rolls %2$d for %3$s")
+-- Convert a Blizzard format string (e.g. LOOT_ROLL_ROLLED_NEED = "%s rolls %d (%s)" or "%3$s rolls %1$d for %2$s")
 -- into a Lua pattern + ordered capture map
 local function CreatePatternFromGlobalString(globalStr, argOrder)
     if not globalStr or globalStr == "" then return nil end
 
-    -- Escape magic Lua pattern characters except %
-    local escaped = globalStr:gsub("([%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")
+    local effectiveOrder = {}
+    local seqIdx = 0
 
-    -- Track positional or sequential specifiers
+    -- 1. Replace format specifiers (%s, %d, %1$s, %2$d) with safe placeholders BEFORE escaping Lua magic chars
+    --    (otherwise escaping '$' to '%$' first breaks '%%%d*%$?s' and leaves '%1' in the pattern,
+    --    which Lua's string.match interprets as an invalid capture index!)
+    local prepared = globalStr:gsub("%%(%d*)%$?([sd])", function(posStr, specType)
+        seqIdx = seqIdx + 1
+        local argIdx = tonumber(posStr) or seqIdx
+        if argOrder and argOrder[argIdx] then
+            table.insert(effectiveOrder, argOrder[argIdx])
+        end
+        return (specType == "d") and "\2" or "\1"
+    end)
+
+    -- 2. Escape all Lua pattern magic characters (including any remaining literal % signs)
+    local escaped = prepared:gsub("([%%%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")
+
+    -- 3. Restore placeholders as valid Lua capture groups
     local pattern = escaped
-        :gsub("%%%d*%$?s", "(.+)")
-        :gsub("%%%d*%$?d", "(%%d+)")
+        :gsub("\1", "(.+)")
+        :gsub("\2", "(%%d+)")
 
     return {
         pattern = "^" .. pattern .. "$",
-        order = argOrder,
+        order = (#effectiveOrder > 0) and effectiveOrder or argOrder,
     }
 end
 
