@@ -5,10 +5,10 @@ local DataTracker = ns.DataTracker
 local RollTrackerFrame = {}
 ns.RollTrackerFrame = RollTrackerFrame
 
-local WINDOW_WIDTH_ICONS = 324
-local WINDOW_WIDTH_TEXT  = 360
-local WINDOW_WIDTH_BOTH  = 378
-local HEADER_HEIGHT = 56
+local WINDOW_WIDTH_ICONS = 304
+local WINDOW_WIDTH_TEXT  = 358
+local WINDOW_WIDTH_BOTH  = 376
+local HEADER_HEIGHT = 38
 local FOOTER_HEIGHT = 26
 local ROW_HEIGHT = 20
 local MIN_VISIBLE_ROWS = 5
@@ -315,22 +315,23 @@ local function CreatePlayerRow(parent, index)
     -- 5. Roll Choice Icon (Dice / Coin / DE / Pass)
     local choiceIcon = row:CreateTexture(nil, "ARTWORK")
     choiceIcon:SetSize(16, 16)
-    choiceIcon:SetPoint("LEFT", row, "LEFT", 235, 0)
+    choiceIcon:SetPoint("LEFT", row, "LEFT", 222, 0)
     row.choiceIcon = choiceIcon
 
     -- 6. Roll Choice Text ("Need", "Greed", "Pass")
     local choiceText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     choiceText:SetPoint("LEFT", choiceIcon, "RIGHT", 4, 0)
-    choiceText:SetWidth(76)
+    choiceText:SetWidth(68)
     choiceText:SetJustifyH("LEFT")
     choiceText:SetWordWrap(false)
     row.choiceText = choiceText
 
-    -- 7. Roll Score ("94")
+    -- 7. Roll Score ("100")
     local scoreText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     scoreText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-    scoreText:SetWidth(26)
+    scoreText:SetWidth(36)
     scoreText:SetJustifyH("RIGHT")
+    scoreText:SetWordWrap(false)
     row.scoreText = scoreText
 
     row:SetScript("OnClick", function(self, button)
@@ -608,49 +609,21 @@ function RollTrackerFrame:Init()
         frame:GetScript("OnDragStop")(frame)
     end)
 
-    -- Column Headers Row
-    local colHeader = CreateFrame("Frame", nil, frame)
-    colHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -34)
-    colHeader:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -34)
-    colHeader:SetHeight(16)
-
-    local hRank = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hRank:SetPoint("LEFT", 4, 0)
-    hRank:SetText(L.HEADER_RANK)
-    hRank:SetTextColor(0.85, 0.75, 0.45)
-
-    local hName = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hName:SetPoint("LEFT", 44, 0)
-    hName:SetText(L.HEADER_NAME)
-    hName:SetTextColor(0.85, 0.75, 0.45)
-
-    local hChoice = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hChoice:SetPoint("LEFT", 222, 0)
-    hChoice:SetWidth(42)
-    hChoice:SetJustifyH("CENTER")
-    hChoice:SetText(L.HEADER_CHOICE)
-    hChoice:SetTextColor(0.85, 0.75, 0.45)
-    frame.hChoice = hChoice
-
-    local hRoll = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hRoll:SetPoint("RIGHT", -4, 0)
-    hRoll:SetText(L.HEADER_ROLL)
-    hRoll:SetTextColor(0.85, 0.75, 0.45)
-
-    local divider = colHeader:CreateTexture(nil, "ARTWORK")
-    divider:SetHeight(1)
-    divider:SetPoint("BOTTOMLEFT", colHeader, "BOTTOMLEFT", 0, 0)
-    divider:SetPoint("BOTTOMRIGHT", colHeader, "BOTTOMRIGHT", 0, 0)
-    divider:SetColorTexture(0.6, 0.5, 0.3, 0.5)
+    -- Divider line below Item Header
+    local headerDivider = frame:CreateTexture(nil, "ARTWORK")
+    headerDivider:SetHeight(1)
+    headerDivider:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -34)
+    headerDivider:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -34)
+    headerDivider:SetColorTexture(0.6, 0.5, 0.3, 0.5)
 
     -- Pure-Lua Container & ScrollBar for Player Rows (no FauxScrollFrameTemplate dependency)
     local rowContainer = CreateFrame("Frame", "ClearLootRollRowContainer", frame)
-    rowContainer:SetPoint("TOPLEFT", colHeader, "BOTTOMLEFT", 0, -2)
+    rowContainer:SetPoint("TOPLEFT", headerDivider, "BOTTOMLEFT", 0, -3)
     rowContainer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, FOOTER_HEIGHT)
     frame.rowContainer = rowContainer
 
     local scrollBar = CreateFrame("Slider", "ClearLootRollScrollBar", frame)
-    scrollBar:SetPoint("TOPRIGHT", colHeader, "BOTTOMRIGHT", -1, -4)
+    scrollBar:SetPoint("TOPRIGHT", headerDivider, "BOTTOMRIGHT", -1, -4)
     scrollBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -11, FOOTER_HEIGHT + 4)
     scrollBar:SetWidth(8)
     scrollBar:SetOrientation("VERTICAL")
@@ -935,20 +908,6 @@ function RollTrackerFrame:UpdatePlayerRows()
     frame:SetSize(winWidth, targetHeight)
 
     local choiceMode = self:GetChoiceDisplayMode()
-    if frame.hChoice then
-        frame.hChoice:ClearAllPoints()
-        frame.hChoice:SetPoint("LEFT", 222, 0)
-        if choiceMode == "ICONS" then
-            frame.hChoice:SetWidth(42)
-            frame.hChoice:SetJustifyH("CENTER")
-        elseif choiceMode == "TEXT" then
-            frame.hChoice:SetWidth(78)
-            frame.hChoice:SetJustifyH("LEFT")
-        else
-            frame.hChoice:SetWidth(96)
-            frame.hChoice:SetJustifyH("LEFT")
-        end
-    end
 
     local maxOffset = math.max(0, numPlayers - visibleRows)
     frame.maxScrollOffset = maxOffset
@@ -1039,7 +998,7 @@ function RollTrackerFrame:UpdatePlayerRows()
                 row.choiceText:Hide()
                 if iconPath then
                     row.choiceIcon:ClearAllPoints()
-                    row.choiceIcon:SetPoint("CENTER", row, "LEFT", 243, 0)
+                    row.choiceIcon:SetPoint("CENTER", row, "LEFT", 228, 0)
                     row.choiceIcon:SetTexture(iconPath)
                     row.choiceIcon:Show()
                 else
@@ -1049,8 +1008,8 @@ function RollTrackerFrame:UpdatePlayerRows()
                 row.choiceIcon:Hide()
                 if p.rollType ~= DataTracker.ROLL_TYPE_PENDING then
                     row.choiceText:ClearAllPoints()
-                    row.choiceText:SetPoint("LEFT", row, "LEFT", 222, 0)
-                    row.choiceText:SetWidth(78)
+                    row.choiceText:SetPoint("LEFT", row, "LEFT", 220, 0)
+                    row.choiceText:SetWidth(68)
                     row.choiceText:SetText(DataTracker:GetRollTypeLabel(p.rollType))
                     row.choiceText:SetTextColor(rc.r, rc.g, rc.b)
                     row.choiceText:Show()
@@ -1060,13 +1019,13 @@ function RollTrackerFrame:UpdatePlayerRows()
             else
                 if iconPath then
                     row.choiceIcon:ClearAllPoints()
-                    row.choiceIcon:SetPoint("LEFT", row, "LEFT", 222, 0)
+                    row.choiceIcon:SetPoint("LEFT", row, "LEFT", 220, 0)
                     row.choiceIcon:SetTexture(iconPath)
                     row.choiceIcon:Show()
 
                     row.choiceText:ClearAllPoints()
                     row.choiceText:SetPoint("LEFT", row.choiceIcon, "RIGHT", 4, 0)
-                    row.choiceText:SetWidth(76)
+                    row.choiceText:SetWidth(68)
                     row.choiceText:SetText(DataTracker:GetRollTypeLabel(p.rollType))
                     row.choiceText:SetTextColor(rc.r, rc.g, rc.b)
                     row.choiceText:Show()
