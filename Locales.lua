@@ -14,7 +14,17 @@ local L = {
     ROLL_GREED = _G.GREED or "Greed",
     ROLL_DISENCHANT = _G.ROLL_DISENCHANT or "Disenchant",
     ROLL_PASS = _G.PASS or "Pass",
+    ROLL_RANDOM = _G.ROLL or "Roll",
     ROLL_PENDING = "",
+
+    -- Random Roll (/roll 1-100) Session
+    RANDOM_ROLL_TITLE = "Random Roll (1-100)",
+    RANDOM_ROLL_TOOLTIP_DESC = "Tracks standard /roll (1-100) from group/raid members.\nOnly the first roll per player is counted.",
+    TOOLTIP_RANDOM_ROLL_BTN = "Roll (1-100)",
+    TOOLTIP_RANDOM_ROLL_BTN_DESC = "Click to perform a standard /roll (1-100).",
+    TOOLTIP_RANDOM_ROLL_DONE = "You have already rolled in this session.",
+    TOOLTIP_RESTART_ROLL_BTN = "Restart Roll Session",
+    TOOLTIP_RESTART_ROLL_BTN_DESC = "Clear current rolls and start a fresh /roll (1-100) round.",
 
     -- Table Headers
     HEADER_RANK = "#",
@@ -75,10 +85,23 @@ local L = {
     SETTINGS_OPACITY_DESC = "Adjust the opacity/transparency of the ClearLoot window (100% = fully opaque).",
     SETTINGS_SCALE = "Window Scale",
     SETTINGS_SCALE_DESC = "Adjust the size of the ClearLoot window (100% = normal size).",
+    SETTINGS_RANDOM_HEADER = "Random Rolls (/roll 1-100)",
+    SETTINGS_RANDOM_ENABLE = "Track Group Random Rolls (/roll 1-100)",
+    SETTINGS_RANDOM_ENABLE_DESC = "Open the tracker window when a group or raid member performs a standard /roll (1-100), such as for dungeon chests. Only counts the first roll per member.",
+    SETTINGS_RANDOM_SOLO = "Track Solo Random Rolls",
+    SETTINGS_RANDOM_SOLO_DESC = "Also open the tracker window when you perform a /roll (1-100) while not in a group.",
+    SETTINGS_RANDOM_TIMEOUT = "Random Roll Timeout",
+    SETTINGS_RANDOM_TIMEOUT_DESC = "How long to wait for remaining group members to /roll before finalizing the winner.",
+    SETTINGS_RANDOM_TIMEOUT_15S = "15 Seconds",
+    SETTINGS_RANDOM_TIMEOUT_20S = "20 Seconds",
+    SETTINGS_RANDOM_TIMEOUT_30S = "30 Seconds (Default)",
+    SETTINGS_RANDOM_TIMEOUT_45S = "45 Seconds",
+    SETTINGS_RANDOM_TIMEOUT_60S = "60 Seconds",
     SETTINGS_TEST_HEADER = "Solo Testing & Simulation",
     SETTINGS_TEST_SINGLE_BTN = "Test Single Item Roll",
     SETTINGS_TEST_MULTI_BTN = "Test 4-Item Boss Drop",
     SETTINGS_TEST_RAID_BTN = "Test 40-Man Raid Roll",
+    SETTINGS_TEST_RANDOM_BTN = "Test /roll (1-100)",
     SETTINGS_MOVE_BTN = "Move Window",
     SETTINGS_RESET_POS_BTN = "Reset Position",
     EDIT_MODE_LABEL = "Clear Loot\nDrag to Move",
@@ -89,13 +112,16 @@ local L = {
     SLASH_HELP_TEST = "  |cffffd100/cl test|r - Simulate a single contested item roll",
     SLASH_HELP_TESTMULTI = "  |cffffd100/cl testmulti|r - Simulate 4 simultaneous contested item rolls",
     SLASH_HELP_TESTRAID = "  |cffffd100/cl testraid|r - Simulate a 40-player raid item roll",
+    SLASH_HELP_TESTROLL = "  |cffffd100/cl testroll|r - Simulate a 5-player chest /roll (1-100)",
     SLASH_HELP_STOP = "  |cffffd100/cl stop|r - Clear active simulated rolls",
     SLASH_HELP_SHOW = "  |cffffd100/cl show|r - Show the tracker window",
     SLASH_HELP_MOVE = "  |cffffd100/cl move|r - Unlock/lock window for positioning",
     SLASH_HELP_CONFIG = "  |cffffd100/cl config|r - Open ClearLoot settings",
     MSG_SIM_STARTED = "Started simulated loot roll (%d item(s)).",
+    MSG_SIM_RANDOM_STARTED = "Started simulated /roll (1-100) session.",
     MSG_SIM_STOPPED = "Cleared simulated loot rolls.",
     MSG_POS_RESET = "Window position reset to default.",
+    MSG_RANDOM_RESTARTED = "Random Roll (1-100) session restarted.",
 }
 
 if locale == "ruRU" then
@@ -149,10 +175,30 @@ if locale == "ruRU" then
     L.SETTINGS_OPACITY_DESC = "Настройка прозрачности окна ClearLoot (100% — полностью непрозрачное)."
     L.SETTINGS_SCALE = "Масштаб окна"
     L.SETTINGS_SCALE_DESC = "Настройка размера окна ClearLoot (100% — стандартный размер)."
+    L.RANDOM_ROLL_TITLE = "Случайный бросок (1-100)"
+    L.RANDOM_ROLL_TOOLTIP_DESC = "Отслеживает стандартные броски /roll (1-100) участников группы/рейда.\nЗасчитывается только первый бросок каждого игрока."
+    L.TOOLTIP_RANDOM_ROLL_BTN = "Бросить кости (1-100)"
+    L.TOOLTIP_RANDOM_ROLL_BTN_DESC = "Нажмите, чтобы выполнить стандартный бросок /roll (1-100)."
+    L.TOOLTIP_RANDOM_ROLL_DONE = "Вы уже сделали бросок в этом розыгрыше."
+    L.TOOLTIP_RESTART_ROLL_BTN = "Перезапустить розыгрыш"
+    L.TOOLTIP_RESTART_ROLL_BTN_DESC = "Очистить текущие броски и начать новый раунд /roll (1-100)."
+    L.SETTINGS_RANDOM_HEADER = "Случайные броски (/roll 1-100)"
+    L.SETTINGS_RANDOM_ENABLE = "Отслеживать /roll (1-100) группы и рейда"
+    L.SETTINGS_RANDOM_ENABLE_DESC = "Открывать окно при броске /roll (1-100) участником группы или рейда (например, для сундуков в подземельях). Учитывается только 1-й бросок."
+    L.SETTINGS_RANDOM_SOLO = "Отслеживать одиночные /roll"
+    L.SETTINGS_RANDOM_SOLO_DESC = "Открывать окно также при вашем собственном броске /roll (1-100) вне группы."
+    L.SETTINGS_RANDOM_TIMEOUT = "Таймаут ожидания /roll"
+    L.SETTINGS_RANDOM_TIMEOUT_DESC = "Сколько секунд ждать бросков остальных участников группы перед подведением итогов."
+    L.SETTINGS_RANDOM_TIMEOUT_15S = "15 сек."
+    L.SETTINGS_RANDOM_TIMEOUT_20S = "20 сек."
+    L.SETTINGS_RANDOM_TIMEOUT_30S = "30 сек. (по умолчанию)"
+    L.SETTINGS_RANDOM_TIMEOUT_45S = "45 сек."
+    L.SETTINGS_RANDOM_TIMEOUT_60S = "60 сек."
     L.SETTINGS_TEST_HEADER = "Тестирование и симуляция"
     L.SETTINGS_TEST_SINGLE_BTN = "Тест: 1 предмет"
     L.SETTINGS_TEST_MULTI_BTN = "Тест: 4 предмета"
     L.SETTINGS_TEST_RAID_BTN = "Тест: Рейд 40 чел."
+    L.SETTINGS_TEST_RANDOM_BTN = "Тест: /roll (1-100)"
     L.SETTINGS_MOVE_BTN = "Переместить окно"
     L.SETTINGS_RESET_POS_BTN = "Сбросить позицию"
     L.EDIT_MODE_LABEL = "Clear Loot\nПеретащите окно"
@@ -161,13 +207,16 @@ if locale == "ruRU" then
     L.SLASH_HELP_TEST = "  |cffffd100/cl test|r - Тест розыгрыша 1 предмета"
     L.SLASH_HELP_TESTMULTI = "  |cffffd100/cl testmulti|r - Тест розыгрыша 4 предметов"
     L.SLASH_HELP_TESTRAID = "  |cffffd100/cl testraid|r - Тест рейдового розыгрыша (40 чел.)"
+    L.SLASH_HELP_TESTROLL = "  |cffffd100/cl testroll|r - Тест броска /roll (1-100) на сундук"
     L.SLASH_HELP_STOP = "  |cffffd100/cl stop|r - Остановить симуляцию"
     L.SLASH_HELP_SHOW = "  |cffffd100/cl show|r - Показать окно"
     L.SLASH_HELP_MOVE = "  |cffffd100/cl move|r - Режим перемещения окна"
     L.SLASH_HELP_CONFIG = "  |cffffd100/cl config|r - Открыть настройки"
     L.MSG_SIM_STARTED = "Запущена симуляция розыгрыша (%d предм.)."
+    L.MSG_SIM_RANDOM_STARTED = "Запущена симуляция /roll (1-100)."
     L.MSG_SIM_STOPPED = "Симуляция розыгрыша остановлена."
     L.MSG_POS_RESET = "Позиция окна сброшена по умолчанию."
+    L.MSG_RANDOM_RESTARTED = "Розыгрыш /roll (1-100) перезапущен."
 
 elseif locale == "deDE" then
     L.ADDON_SUBTITLE = "Echtzeit-Beutewurf-Tracker für Gruppen und Schlachtzüge."
@@ -220,17 +269,39 @@ elseif locale == "deDE" then
     L.SETTINGS_OPACITY_DESC = "Deckkraft/Transparenz des ClearLoot-Fensters anpassen (100% = undurchsichtig)."
     L.SETTINGS_SCALE = "Fensterskalierung"
     L.SETTINGS_SCALE_DESC = "Größe des ClearLoot-Fensters anpassen (100% = Standardgröße)."
+    L.RANDOM_ROLL_TITLE = "Zufallswurf (1-100)"
+    L.RANDOM_ROLL_TOOLTIP_DESC = "Verfolgt Standard-/roll (1-100) von Gruppen-/Schlachtzugsmitgliedern.\nEs zählt nur der erste Wurf pro Spieler."
+    L.TOOLTIP_RANDOM_ROLL_BTN = "Würfeln (1-100)"
+    L.TOOLTIP_RANDOM_ROLL_BTN_DESC = "Klicken, um einen Standard-/roll (1-100) auszuführen."
+    L.TOOLTIP_RANDOM_ROLL_DONE = "Du hast in dieser Runde bereits gewürfelt."
+    L.TOOLTIP_RESTART_ROLL_BTN = "Wurfrunde neu starten"
+    L.TOOLTIP_RESTART_ROLL_BTN_DESC = "Aktuelle Würfe löschen und eine neue /roll (1-100)-Runde starten."
+    L.SETTINGS_RANDOM_HEADER = "Zufallswürfe (/roll 1-100)"
+    L.SETTINGS_RANDOM_ENABLE = "Gruppen-Zufallswürfe (/roll 1-100) verfolgen"
+    L.SETTINGS_RANDOM_ENABLE_DESC = "Öffnet das Fenster, wenn ein Gruppen-/Schlachtzugsmitglied /roll (1-100) eingibt (z.B. für Truhen). Nur der 1. Wurf zählt."
+    L.SETTINGS_RANDOM_SOLO = "Solo-Zufallswürfe verfolgen"
+    L.SETTINGS_RANDOM_SOLO_DESC = "Öffnet das Fenster auch bei eigenem /roll (1-100) außerhalb einer Gruppe."
+    L.SETTINGS_RANDOM_TIMEOUT = "Zufallswurf-Zeitlimit"
+    L.SETTINGS_RANDOM_TIMEOUT_DESC = "Wartezeit auf verbleibende Gruppenmitglieder beim /roll."
+    L.SETTINGS_RANDOM_TIMEOUT_15S = "15 Sekunden"
+    L.SETTINGS_RANDOM_TIMEOUT_20S = "20 Sekunden"
+    L.SETTINGS_RANDOM_TIMEOUT_30S = "30 Sekunden (Standard)"
+    L.SETTINGS_RANDOM_TIMEOUT_45S = "45 Sekunden"
+    L.SETTINGS_RANDOM_TIMEOUT_60S = "60 Sekunden"
     L.SETTINGS_TEST_HEADER = "Simulation & Test"
     L.SETTINGS_TEST_SINGLE_BTN = "Test: 1 Gegenstand"
     L.SETTINGS_TEST_MULTI_BTN = "Test: 4 Gegenstände"
     L.SETTINGS_TEST_RAID_BTN = "Test: 40er-Schlachtzug"
+    L.SETTINGS_TEST_RANDOM_BTN = "Test: /roll (1-100)"
     L.SETTINGS_MOVE_BTN = "Fenster bewegen"
     L.SETTINGS_RESET_POS_BTN = "Position zurücksetzen"
     L.EDIT_MODE_LABEL = "Clear Loot\nZum Bewegen ziehen"
     L.EDIT_MODE_LOCK_BTN = "Sperren"
     L.MSG_SIM_STARTED = "Beutewurf-Simulation gestartet (%d Gegenstand/Gegenstände)."
+    L.MSG_SIM_RANDOM_STARTED = "Zufallswurf-Simulation (/roll 1-100) gestartet."
     L.MSG_SIM_STOPPED = "Beutewurf-Simulation beendet."
     L.MSG_POS_RESET = "Fensterposition wurde zurückgesetzt."
+    L.MSG_RANDOM_RESTARTED = "Zufallswurf-Runde (1-100) neu gestartet."
 
 elseif locale == "frFR" then
     L.ADDON_SUBTITLE = "Suivi en temps réel des jets de butin de groupe et de raid."
@@ -283,17 +354,39 @@ elseif locale == "frFR" then
     L.SETTINGS_OPACITY_DESC = "Ajuster l'opacité/transparence de la fenêtre ClearLoot (100% = opaque)."
     L.SETTINGS_SCALE = "Échelle de la fenêtre"
     L.SETTINGS_SCALE_DESC = "Ajuster la taille de la fenêtre ClearLoot (100% = taille normale)."
+    L.RANDOM_ROLL_TITLE = "Jet aléatoire (1-100)"
+    L.RANDOM_ROLL_TOOLTIP_DESC = "Suit les jets /roll (1-100) des membres du groupe/raid.\nSeul le premier jet par joueur est pris en compte."
+    L.TOOLTIP_RANDOM_ROLL_BTN = "Lancer les dés (1-100)"
+    L.TOOLTIP_RANDOM_ROLL_BTN_DESC = "Cliquez pour effectuer un /roll (1-100)."
+    L.TOOLTIP_RANDOM_ROLL_DONE = "Vous avez déjà lancé les dés pour cette session."
+    L.TOOLTIP_RESTART_ROLL_BTN = "Recommencer la session"
+    L.TOOLTIP_RESTART_ROLL_BTN_DESC = "Effacer les jets actuels et relancer un tour de /roll (1-100)."
+    L.SETTINGS_RANDOM_HEADER = "Jets aléatoires (/roll 1-100)"
+    L.SETTINGS_RANDOM_ENABLE = "Suivre les /roll (1-100) du groupe"
+    L.SETTINGS_RANDOM_ENABLE_DESC = "Ouvre la fenêtre lorsqu'un membre du groupe ou raid effectue un /roll (1-100) (ex. coffres). Seul le 1er jet compte."
+    L.SETTINGS_RANDOM_SOLO = "Suivre les /roll en solo"
+    L.SETTINGS_RANDOM_SOLO_DESC = "Ouvre également la fenêtre lors d'un /roll (1-100) hors groupe."
+    L.SETTINGS_RANDOM_TIMEOUT = "Délai d'attente /roll"
+    L.SETTINGS_RANDOM_TIMEOUT_DESC = "Durée d'attente des autres membres avant de finaliser le gagnant."
+    L.SETTINGS_RANDOM_TIMEOUT_15S = "15 secondes"
+    L.SETTINGS_RANDOM_TIMEOUT_20S = "20 secondes"
+    L.SETTINGS_RANDOM_TIMEOUT_30S = "30 secondes (Défaut)"
+    L.SETTINGS_RANDOM_TIMEOUT_45S = "45 secondes"
+    L.SETTINGS_RANDOM_TIMEOUT_60S = "60 secondes"
     L.SETTINGS_TEST_HEADER = "Simulation et test"
     L.SETTINGS_TEST_SINGLE_BTN = "Test : 1 objet"
     L.SETTINGS_TEST_MULTI_BTN = "Test : 4 objets"
     L.SETTINGS_TEST_RAID_BTN = "Test : Raid 40 joueurs"
+    L.SETTINGS_TEST_RANDOM_BTN = "Test : /roll (1-100)"
     L.SETTINGS_MOVE_BTN = "Déplacer la fenêtre"
     L.SETTINGS_RESET_POS_BTN = "Réinitialiser la position"
     L.EDIT_MODE_LABEL = "Clear Loot\nGlisser pour déplacer"
     L.EDIT_MODE_LOCK_BTN = "Verrouiller"
     L.MSG_SIM_STARTED = "Simulation de butin lancée (%d objet(s))."
+    L.MSG_SIM_RANDOM_STARTED = "Simulation de /roll (1-100) lancée."
     L.MSG_SIM_STOPPED = "Simulation de butin arrêtée."
     L.MSG_POS_RESET = "Position de la fenêtre réinitialisée."
+    L.MSG_RANDOM_RESTARTED = "Session de /roll (1-100) relancée."
 
 elseif locale == "esES" or locale == "esMX" then
     L.ADDON_SUBTITLE = "Seguimiento en tiempo real de tiradas de botín de grupo y banda."
@@ -346,17 +439,39 @@ elseif locale == "esES" or locale == "esMX" then
     L.SETTINGS_OPACITY_DESC = "Ajusta la opacidad/transparencia de la ventana ClearLoot (100% = opaca)."
     L.SETTINGS_SCALE = "Escala de la ventana"
     L.SETTINGS_SCALE_DESC = "Ajusta el tamaño de la ventana ClearLoot (100% = tamaño normal)."
+    L.RANDOM_ROLL_TITLE = "Tirada aleatoria (1-100)"
+    L.RANDOM_ROLL_TOOLTIP_DESC = "Rastrea tiradas estándar /roll (1-100) de miembros del grupo o banda.\nSolo cuenta la primera tirada de cada jugador."
+    L.TOOLTIP_RANDOM_ROLL_BTN = "Tirar dados (1-100)"
+    L.TOOLTIP_RANDOM_ROLL_BTN_DESC = "Haz clic para realizar un /roll (1-100)."
+    L.TOOLTIP_RANDOM_ROLL_DONE = "Ya has tirado en esta sesión."
+    L.TOOLTIP_RESTART_ROLL_BTN = "Reiniciar sesión de tirada"
+    L.TOOLTIP_RESTART_ROLL_BTN_DESC = "Borrar las tiradas actuales e iniciar una nueva ronda de /roll (1-100)."
+    L.SETTINGS_RANDOM_HEADER = "Tiradas aleatorias (/roll 1-100)"
+    L.SETTINGS_RANDOM_ENABLE = "Rastrear /roll (1-100) de grupo"
+    L.SETTINGS_RANDOM_ENABLE_DESC = "Abre la ventana cuando un miembro del grupo o banda realiza un /roll (1-100) (ej. cofres). Solo cuenta la 1ª tirada."
+    L.SETTINGS_RANDOM_SOLO = "Rastrear /roll en solitario"
+    L.SETTINGS_RANDOM_SOLO_DESC = "También abre la ventana cuando realizas un /roll (1-100) fuera de grupo."
+    L.SETTINGS_RANDOM_TIMEOUT = "Tiempo de espera de /roll"
+    L.SETTINGS_RANDOM_TIMEOUT_DESC = "Tiempo de espera para que los demás miembros tiren antes de finalizar al ganador."
+    L.SETTINGS_RANDOM_TIMEOUT_15S = "15 segundos"
+    L.SETTINGS_RANDOM_TIMEOUT_20S = "20 segundos"
+    L.SETTINGS_RANDOM_TIMEOUT_30S = "30 segundos (Predeterminado)"
+    L.SETTINGS_RANDOM_TIMEOUT_45S = "45 segundos"
+    L.SETTINGS_RANDOM_TIMEOUT_60S = "60 segundos"
     L.SETTINGS_TEST_HEADER = "Simulación y prueba"
     L.SETTINGS_TEST_SINGLE_BTN = "Prueba: 1 objeto"
     L.SETTINGS_TEST_MULTI_BTN = "Prueba: 4 objetos"
     L.SETTINGS_TEST_RAID_BTN = "Prueba: Banda de 40"
+    L.SETTINGS_TEST_RANDOM_BTN = "Prueba: /roll (1-100)"
     L.SETTINGS_MOVE_BTN = "Mover ventana"
     L.SETTINGS_RESET_POS_BTN = "Restablecer posición"
     L.EDIT_MODE_LABEL = "Clear Loot\nArrastra para mover"
     L.EDIT_MODE_LOCK_BTN = "Bloquear"
     L.MSG_SIM_STARTED = "Simulación de tirada iniciada (%d objeto(s))."
+    L.MSG_SIM_RANDOM_STARTED = "Simulación de /roll (1-100) iniciada."
     L.MSG_SIM_STOPPED = "Simulación de tirada detenida."
     L.MSG_POS_RESET = "Posición de la ventana restablecida."
+    L.MSG_RANDOM_RESTARTED = "Sesión de /roll (1-100) reiniciada."
 
 elseif locale == "ptBR" or locale == "ptPT" then
     L.ADDON_SUBTITLE = "Rastreador em tempo real de rolagens de saque para grupo e raide."
@@ -409,17 +524,39 @@ elseif locale == "ptBR" or locale == "ptPT" then
     L.SETTINGS_OPACITY_DESC = "Ajusta a opacidade/transparência da janela ClearLoot (100% = totalmente opaca)."
     L.SETTINGS_SCALE = "Escala da janela"
     L.SETTINGS_SCALE_DESC = "Ajusta o tamanho da janela ClearLoot (100% = tamanho padrão)."
+    L.RANDOM_ROLL_TITLE = "Rolagem aleatória (1-100)"
+    L.RANDOM_ROLL_TOOLTIP_DESC = "Rastreia rolagens padrão /roll (1-100) de membros do grupo/raide.\nApenas a primeira rolagem de cada jogador é contabilizada."
+    L.TOOLTIP_RANDOM_ROLL_BTN = "Rolar dados (1-100)"
+    L.TOOLTIP_RANDOM_ROLL_BTN_DESC = "Clique para realizar um /roll (1-100)."
+    L.TOOLTIP_RANDOM_ROLL_DONE = "Você já rolou nesta sessão."
+    L.TOOLTIP_RESTART_ROLL_BTN = "Reiniciar sessão"
+    L.TOOLTIP_RESTART_ROLL_BTN_DESC = "Limpar as rolagens atuais e iniciar uma nova rodada de /roll (1-100)."
+    L.SETTINGS_RANDOM_HEADER = "Rolagens aleatórias (/roll 1-100)"
+    L.SETTINGS_RANDOM_ENABLE = "Rastrear /roll (1-100) do grupo"
+    L.SETTINGS_RANDOM_ENABLE_DESC = "Abre a janela quando um membro do grupo/raide realiza um /roll (1-100) (ex. baús). Apenas a 1ª rolagem conta."
+    L.SETTINGS_RANDOM_SOLO = "Rastrear /roll solo"
+    L.SETTINGS_RANDOM_SOLO_DESC = "Também abre a janela ao realizar um /roll (1-100) fora de grupo."
+    L.SETTINGS_RANDOM_TIMEOUT = "Tempo limite do /roll"
+    L.SETTINGS_RANDOM_TIMEOUT_DESC = "Quanto tempo aguardar os demais membros rolarem antes de finalizar o vencedor."
+    L.SETTINGS_RANDOM_TIMEOUT_15S = "15 segundos"
+    L.SETTINGS_RANDOM_TIMEOUT_20S = "20 segundos"
+    L.SETTINGS_RANDOM_TIMEOUT_30S = "30 segundos (Padrão)"
+    L.SETTINGS_RANDOM_TIMEOUT_45S = "45 segundos"
+    L.SETTINGS_RANDOM_TIMEOUT_60S = "60 segundos"
     L.SETTINGS_TEST_HEADER = "Simulação e Teste"
     L.SETTINGS_TEST_SINGLE_BTN = "Teste: 1 item"
     L.SETTINGS_TEST_MULTI_BTN = "Teste: 4 itens"
     L.SETTINGS_TEST_RAID_BTN = "Teste: Raide 40 jog."
+    L.SETTINGS_TEST_RANDOM_BTN = "Teste: /roll (1-100)"
     L.SETTINGS_MOVE_BTN = "Mover janela"
     L.SETTINGS_RESET_POS_BTN = "Redefinir posição"
     L.EDIT_MODE_LABEL = "Clear Loot\nArraste para mover"
     L.EDIT_MODE_LOCK_BTN = "Travar"
     L.MSG_SIM_STARTED = "Simulação de saque iniciada (%d item(ns))."
+    L.MSG_SIM_RANDOM_STARTED = "Simulação de /roll (1-100) iniciada."
     L.MSG_SIM_STOPPED = "Simulação de saque encerrada."
     L.MSG_POS_RESET = "Posição da janela redefinida para o padrão."
+    L.MSG_RANDOM_RESTARTED = "Sessão de /roll (1-100) reiniciada."
 
 elseif locale == "itIT" then
     L.ADDON_SUBTITLE = "Tracciamento in tempo reale dei tiri per il bottino di gruppo e incursione."
@@ -460,7 +597,7 @@ elseif locale == "itIT" then
     L.SETTINGS_AUTO_CLOSE_DESC = "Chiude automaticamente la finestra dopo il tempo scelto quando l'oggetto viene vinto o tutti hanno tirato."
     L.SETTINGS_AUTO_CLOSE_3S = "3 secondi"
     L.SETTINGS_AUTO_CLOSE_5S = "5 secondi (Predefinito)"
-    L.SETTINGS_AUTO_CLOSE_10S = "10 secondi"
+    L.SETTINGS_AUTO_CLOSE_10S = "10 segundos"
     L.SETTINGS_AUTO_CLOSE_15S = "15 secondi"
     L.SETTINGS_AUTO_CLOSE_NEVER = "Mai"
     L.SETTINGS_ANCHOR_SIDE = "Posizione della finestra"
@@ -469,20 +606,42 @@ elseif locale == "itIT" then
     L.SETTINGS_ANCHOR_LEFT = "A sinistra del bottino"
     L.SETTINGS_ANCHOR_FREE = "Posizione libera / spostabile"
     L.SETTINGS_OPACITY = "Opacità della finestra"
-    L.SETTINGS_OPACITY_DESC = "Regola l'opacità/trasparenza della finestra ClearLoot (100% = opaca)."
+    L.SETTINGS_OPACITY_DESC = "Regola l'opacità/transparence della finestra ClearLoot (100% = opaca)."
     L.SETTINGS_SCALE = "Scala della finestra"
     L.SETTINGS_SCALE_DESC = "Regola la dimensione della finestra ClearLoot (100% = dimensione normale)."
+    L.RANDOM_ROLL_TITLE = "Tiro casuale (1-100)"
+    L.RANDOM_ROLL_TOOLTIP_DESC = "Traccia i tiri standard /roll (1-100) dei membri del gruppo/incursione.\nConta solo il primo tiro per giocatore."
+    L.TOOLTIP_RANDOM_ROLL_BTN = "Tira i dadi (1-100)"
+    L.TOOLTIP_RANDOM_ROLL_BTN_DESC = "Clicca per eseguire un /roll (1-100)."
+    L.TOOLTIP_RANDOM_ROLL_DONE = "Hai già tirato in questa sessione."
+    L.TOOLTIP_RESTART_ROLL_BTN = "Riavvia sessione"
+    L.TOOLTIP_RESTART_ROLL_BTN_DESC = "Cancella i tiri attuali e avvia un nuovo turno di /roll (1-100)."
+    L.SETTINGS_RANDOM_HEADER = "Tiri casuali (/roll 1-100)"
+    L.SETTINGS_RANDOM_ENABLE = "Traccia /roll (1-100) del gruppo"
+    L.SETTINGS_RANDOM_ENABLE_DESC = "Apre la finestra quando un membro del gruppo/incursione esegue un /roll (1-100) (es. forzieri). Conta solo il 1° tiro."
+    L.SETTINGS_RANDOM_SOLO = "Traccia /roll in solitaria"
+    L.SETTINGS_RANDOM_SOLO_DESC = "Apre la finestra anche quando esegui un /roll (1-100) fuori dal gruppo."
+    L.SETTINGS_RANDOM_TIMEOUT = "Timeout attesa /roll"
+    L.SETTINGS_RANDOM_TIMEOUT_DESC = "Quanto tempo attendere i tiri degli altri membri prima di decretare il vincitore."
+    L.SETTINGS_RANDOM_TIMEOUT_15S = "15 secondi"
+    L.SETTINGS_RANDOM_TIMEOUT_20S = "20 secondi"
+    L.SETTINGS_RANDOM_TIMEOUT_30S = "30 secondi (Predefinito)"
+    L.SETTINGS_RANDOM_TIMEOUT_45S = "45 secondi"
+    L.SETTINGS_RANDOM_TIMEOUT_60S = "60 secondi"
     L.SETTINGS_TEST_HEADER = "Simulazione e Test"
     L.SETTINGS_TEST_SINGLE_BTN = "Test: 1 oggetto"
     L.SETTINGS_TEST_MULTI_BTN = "Test: 4 oggetti"
     L.SETTINGS_TEST_RAID_BTN = "Test: Incursione da 40"
+    L.SETTINGS_TEST_RANDOM_BTN = "Test: /roll (1-100)"
     L.SETTINGS_MOVE_BTN = "Sposta finestra"
     L.SETTINGS_RESET_POS_BTN = "Reimposta posizione"
     L.EDIT_MODE_LABEL = "Clear Loot\nTrascina per spostare"
     L.EDIT_MODE_LOCK_BTN = "Blocca"
     L.MSG_SIM_STARTED = "Simulazione bottino avviata (%d oggetto/i)."
+    L.MSG_SIM_RANDOM_STARTED = "Simulazione /roll (1-100) avviata."
     L.MSG_SIM_STOPPED = "Simulazione bottino terminata."
     L.MSG_POS_RESET = "Posizione della finestra reimpostata."
+    L.MSG_RANDOM_RESTARTED = "Sessione /roll (1-100) riavviata."
 end
 
 ns.L = L

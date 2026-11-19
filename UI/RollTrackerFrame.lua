@@ -5,10 +5,10 @@ local DataTracker = ns.DataTracker
 local RollTrackerFrame = {}
 ns.RollTrackerFrame = RollTrackerFrame
 
-local WINDOW_WIDTH_ICONS = 324
-local WINDOW_WIDTH_TEXT  = 360
-local WINDOW_WIDTH_BOTH  = 378
-local HEADER_HEIGHT = 56
+local WINDOW_WIDTH_ICONS = 304
+local WINDOW_WIDTH_TEXT  = 358
+local WINDOW_WIDTH_BOTH  = 376
+local HEADER_HEIGHT = 38
 local FOOTER_HEIGHT = 26
 local ROW_HEIGHT = 20
 local MIN_VISIBLE_ROWS = 5
@@ -16,6 +16,7 @@ local MAX_VISIBLE_ROWS = 10
 local MAX_TABS = 6
 
 local ROLL_ICONS = {
+    [DataTracker.ROLL_TYPE_RANDOM]     = "Interface\\Buttons\\UI-GroupLoot-Dice-Up",
     [DataTracker.ROLL_TYPE_NEED]       = "Interface\\Buttons\\UI-GroupLoot-Dice-Up",
     [DataTracker.ROLL_TYPE_GREED]      = "Interface\\Buttons\\UI-GroupLoot-Coin-Up",
     [DataTracker.ROLL_TYPE_DISENCHANT] = "Interface\\Buttons\\UI-GroupLoot-DE-Up",
@@ -41,6 +42,7 @@ function RollTrackerFrame:GetWindowWidth()
 end
 
 local ROLL_COLORS = {
+    [DataTracker.ROLL_TYPE_RANDOM]     = { r = 0.20, g = 1.00, b = 0.20 },
     [DataTracker.ROLL_TYPE_NEED]       = { r = 0.20, g = 1.00, b = 0.20 },
     [DataTracker.ROLL_TYPE_GREED]      = { r = 0.35, g = 0.80, b = 1.00 },
     [DataTracker.ROLL_TYPE_DISENCHANT] = { r = 0.75, g = 0.45, b = 1.00 },
@@ -313,22 +315,23 @@ local function CreatePlayerRow(parent, index)
     -- 5. Roll Choice Icon (Dice / Coin / DE / Pass)
     local choiceIcon = row:CreateTexture(nil, "ARTWORK")
     choiceIcon:SetSize(16, 16)
-    choiceIcon:SetPoint("LEFT", row, "LEFT", 235, 0)
+    choiceIcon:SetPoint("LEFT", row, "LEFT", 222, 0)
     row.choiceIcon = choiceIcon
 
     -- 6. Roll Choice Text ("Need", "Greed", "Pass")
     local choiceText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     choiceText:SetPoint("LEFT", choiceIcon, "RIGHT", 4, 0)
-    choiceText:SetWidth(76)
+    choiceText:SetWidth(68)
     choiceText:SetJustifyH("LEFT")
     choiceText:SetWordWrap(false)
     row.choiceText = choiceText
 
-    -- 7. Roll Score ("94")
+    -- 7. Roll Score ("100")
     local scoreText = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     scoreText:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-    scoreText:SetWidth(26)
+    scoreText:SetWidth(36)
     scoreText:SetJustifyH("RIGHT")
+    scoreText:SetWordWrap(false)
     row.scoreText = scoreText
 
     row:SetScript("OnClick", function(self, button)
@@ -461,11 +464,111 @@ function RollTrackerFrame:Init()
     end)
     frame.closeBtn = closeBtn
 
+    -- Restart Random Roll Session Button (shown only on Random Roll sessions)
+    local restartRollBtn = CreateFrame("Button", nil, frame, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    restartRollBtn:SetSize(22, 22)
+    restartRollBtn:SetPoint("RIGHT", closeBtn, "LEFT", -2, 0)
+    if restartRollBtn.SetBackdrop then
+        restartRollBtn:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            edgeSize = 8,
+            insets = { left = 1, right = 1, top = 1, bottom = 1 },
+        })
+        restartRollBtn:SetBackdropColor(0.12, 0.12, 0.16, 0.9)
+        restartRollBtn:SetBackdropBorderColor(0.65, 0.55, 0.35, 0.9)
+    end
+    local restartIcon = restartRollBtn:CreateTexture(nil, "ARTWORK")
+    restartIcon:SetSize(15, 15)
+    restartIcon:SetPoint("CENTER", 0, 0)
+    restartIcon:SetTexture("Interface\\Buttons\\UI-RotationLeft-Button-Up")
+    restartRollBtn.icon = restartIcon
+    local restartHl = restartRollBtn:CreateTexture(nil, "HIGHLIGHT")
+    restartHl:SetAllPoints(restartRollBtn)
+    restartHl:SetColorTexture(1, 0.82, 0, 0.2)
+    restartRollBtn:SetScript("OnClick", function()
+        local session = DataTracker:GetCurrentRollSession()
+        if session and session.isRandomRoll then
+            DataTracker:RestartRandomRollSession(session.rollID)
+            if L.MSG_RANDOM_RESTARTED then
+                ns:Print(L.MSG_RANDOM_RESTARTED)
+            end
+        end
+    end)
+    restartRollBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(L.TOOLTIP_RESTART_ROLL_BTN or "Restart Roll Session", 1, 0.82, 0)
+        GameTooltip:AddLine(L.TOOLTIP_RESTART_ROLL_BTN_DESC or "Clear current rolls and start a fresh /roll (1-100) round.", 0.85, 0.85, 0.85, true)
+        GameTooltip:Show()
+    end)
+    restartRollBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    restartRollBtn:Hide()
+    frame.restartRollBtn = restartRollBtn
+
+    -- Quick /roll (1-100) Dice Button (shown only on Random Roll sessions)
+    local rollDiceBtn = CreateFrame("Button", nil, frame, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    rollDiceBtn:SetSize(22, 22)
+    rollDiceBtn:SetPoint("RIGHT", restartRollBtn, "LEFT", -3, 0)
+    if rollDiceBtn.SetBackdrop then
+        rollDiceBtn:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            edgeSize = 8,
+            insets = { left = 1, right = 1, top = 1, bottom = 1 },
+        })
+        rollDiceBtn:SetBackdropColor(0.12, 0.22, 0.12, 0.9)
+        rollDiceBtn:SetBackdropBorderColor(0.35, 0.85, 0.35, 0.95)
+    end
+    local diceIcon = rollDiceBtn:CreateTexture(nil, "ARTWORK")
+    diceIcon:SetSize(16, 16)
+    diceIcon:SetPoint("CENTER", 0, 0)
+    diceIcon:SetTexture("Interface\\Buttons\\UI-GroupLoot-Dice-Up")
+    rollDiceBtn.icon = diceIcon
+    local diceHl = rollDiceBtn:CreateTexture(nil, "HIGHLIGHT")
+    diceHl:SetAllPoints(rollDiceBtn)
+    diceHl:SetColorTexture(0.2, 1.0, 0.2, 0.2)
+    rollDiceBtn:SetScript("OnClick", function()
+        local session = DataTracker:GetCurrentRollSession()
+        if not session or not session.isRandomRoll then return end
+        if DataTracker:HasLocalPlayerRolled(session.rollID) then
+            return
+        end
+        if session.isSimulated then
+            local myDisplayName = ns.RosterInspector:GetUnitNames("player") or (ns.IsForever and "Player Hero" or "Player")
+            DataTracker:SetPlayerRoll(session.rollID, myDisplayName, nil, DataTracker.ROLL_TYPE_RANDOM, math.random(1, 100))
+            DataTracker:NotifyUI()
+            return
+        end
+        if type(RandomRoll) == "function" then
+            RandomRoll(1, 100)
+        end
+    end)
+    rollDiceBtn:SetScript("OnEnter", function(self)
+        local session = DataTracker:GetCurrentRollSession()
+        local alreadyRolled = session and DataTracker:HasLocalPlayerRolled(session.rollID)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(L.TOOLTIP_RANDOM_ROLL_BTN or "Roll (1-100)", 1, 0.82, 0)
+        if alreadyRolled then
+            GameTooltip:AddLine(L.TOOLTIP_RANDOM_ROLL_DONE or "You have already rolled in this session.", 0.65, 0.65, 0.65, true)
+        else
+            GameTooltip:AddLine(L.TOOLTIP_RANDOM_ROLL_BTN_DESC or "Click to perform a standard /roll (1-100).", 0.2, 1.0, 0.2, true)
+        end
+        GameTooltip:Show()
+    end)
+    rollDiceBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+    rollDiceBtn:Hide()
+    frame.rollDiceBtn = rollDiceBtn
+
     -- Item Header Button (Icon + Item Link/Name, hoverable for item tooltip)
     local itemHeader = CreateFrame("Button", nil, frame)
     itemHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -8)
     itemHeader:SetPoint("TOPRIGHT", closeBtn, "TOPLEFT", -2, 0)
     itemHeader:SetHeight(24)
+    frame.itemHeader = itemHeader
 
     local itemIcon = itemHeader:CreateTexture(nil, "ARTWORK")
     itemIcon:SetSize(20, 20)
@@ -484,7 +587,10 @@ function RollTrackerFrame:Init()
         local session = DataTracker:GetCurrentRollSession()
         if not session then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        if session.itemLink then
+        if session.isRandomRoll then
+            GameTooltip:SetText(session.itemName or L.RANDOM_ROLL_TITLE or "Random Roll (1-100)", 1, 0.82, 0)
+            GameTooltip:AddLine(L.RANDOM_ROLL_TOOLTIP_DESC or "Tracks standard /roll (1-100) from group/raid members.\nOnly the first roll per player is counted.", 0.85, 0.85, 0.85, true)
+        elseif session.itemLink then
             GameTooltip:SetHyperlink(session.itemLink)
         elseif session.itemName then
             local r, g, b = ns.GetItemQualityColor(session.itemQuality or 2)
@@ -503,49 +609,21 @@ function RollTrackerFrame:Init()
         frame:GetScript("OnDragStop")(frame)
     end)
 
-    -- Column Headers Row
-    local colHeader = CreateFrame("Frame", nil, frame)
-    colHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -34)
-    colHeader:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -34)
-    colHeader:SetHeight(16)
-
-    local hRank = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hRank:SetPoint("LEFT", 4, 0)
-    hRank:SetText(L.HEADER_RANK)
-    hRank:SetTextColor(0.85, 0.75, 0.45)
-
-    local hName = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hName:SetPoint("LEFT", 44, 0)
-    hName:SetText(L.HEADER_NAME)
-    hName:SetTextColor(0.85, 0.75, 0.45)
-
-    local hChoice = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hChoice:SetPoint("LEFT", 222, 0)
-    hChoice:SetWidth(42)
-    hChoice:SetJustifyH("CENTER")
-    hChoice:SetText(L.HEADER_CHOICE)
-    hChoice:SetTextColor(0.85, 0.75, 0.45)
-    frame.hChoice = hChoice
-
-    local hRoll = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hRoll:SetPoint("RIGHT", -4, 0)
-    hRoll:SetText(L.HEADER_ROLL)
-    hRoll:SetTextColor(0.85, 0.75, 0.45)
-
-    local divider = colHeader:CreateTexture(nil, "ARTWORK")
-    divider:SetHeight(1)
-    divider:SetPoint("BOTTOMLEFT", colHeader, "BOTTOMLEFT", 0, 0)
-    divider:SetPoint("BOTTOMRIGHT", colHeader, "BOTTOMRIGHT", 0, 0)
-    divider:SetColorTexture(0.6, 0.5, 0.3, 0.5)
+    -- Divider line below Item Header
+    local headerDivider = frame:CreateTexture(nil, "ARTWORK")
+    headerDivider:SetHeight(1)
+    headerDivider:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -34)
+    headerDivider:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -34)
+    headerDivider:SetColorTexture(0.6, 0.5, 0.3, 0.5)
 
     -- Pure-Lua Container & ScrollBar for Player Rows (no FauxScrollFrameTemplate dependency)
     local rowContainer = CreateFrame("Frame", "ClearLootRollRowContainer", frame)
-    rowContainer:SetPoint("TOPLEFT", colHeader, "BOTTOMLEFT", 0, -2)
+    rowContainer:SetPoint("TOPLEFT", headerDivider, "BOTTOMLEFT", 0, -3)
     rowContainer:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, FOOTER_HEIGHT)
     frame.rowContainer = rowContainer
 
     local scrollBar = CreateFrame("Slider", "ClearLootRollScrollBar", frame)
-    scrollBar:SetPoint("TOPRIGHT", colHeader, "BOTTOMRIGHT", -1, -4)
+    scrollBar:SetPoint("TOPRIGHT", headerDivider, "BOTTOMRIGHT", -1, -4)
     scrollBar:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -11, FOOTER_HEIGHT + 4)
     scrollBar:SetWidth(8)
     scrollBar:SetOrientation("VERTICAL")
@@ -768,6 +846,11 @@ function RollTrackerFrame:UpdateTabs(activeRolls, currentRollID)
             tab.itemLink = rollSession.itemLink
             tab.itemName = rollSession.itemName
             tab.icon:SetTexture(rollSession.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
+            if rollSession.isRandomRoll then
+                tab.icon:SetTexCoord(0, 1, 0, 1)
+            else
+                tab.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            end
 
             local eval = DataTracker:EvaluateSession(rollSession)
             if eval then
@@ -825,20 +908,6 @@ function RollTrackerFrame:UpdatePlayerRows()
     frame:SetSize(winWidth, targetHeight)
 
     local choiceMode = self:GetChoiceDisplayMode()
-    if frame.hChoice then
-        frame.hChoice:ClearAllPoints()
-        frame.hChoice:SetPoint("LEFT", 222, 0)
-        if choiceMode == "ICONS" then
-            frame.hChoice:SetWidth(42)
-            frame.hChoice:SetJustifyH("CENTER")
-        elseif choiceMode == "TEXT" then
-            frame.hChoice:SetWidth(78)
-            frame.hChoice:SetJustifyH("LEFT")
-        else
-            frame.hChoice:SetWidth(96)
-            frame.hChoice:SetJustifyH("LEFT")
-        end
-    end
 
     local maxOffset = math.max(0, numPlayers - visibleRows)
     frame.maxScrollOffset = maxOffset
@@ -929,7 +998,7 @@ function RollTrackerFrame:UpdatePlayerRows()
                 row.choiceText:Hide()
                 if iconPath then
                     row.choiceIcon:ClearAllPoints()
-                    row.choiceIcon:SetPoint("CENTER", row, "LEFT", 243, 0)
+                    row.choiceIcon:SetPoint("CENTER", row, "LEFT", 228, 0)
                     row.choiceIcon:SetTexture(iconPath)
                     row.choiceIcon:Show()
                 else
@@ -939,8 +1008,8 @@ function RollTrackerFrame:UpdatePlayerRows()
                 row.choiceIcon:Hide()
                 if p.rollType ~= DataTracker.ROLL_TYPE_PENDING then
                     row.choiceText:ClearAllPoints()
-                    row.choiceText:SetPoint("LEFT", row, "LEFT", 222, 0)
-                    row.choiceText:SetWidth(78)
+                    row.choiceText:SetPoint("LEFT", row, "LEFT", 220, 0)
+                    row.choiceText:SetWidth(68)
                     row.choiceText:SetText(DataTracker:GetRollTypeLabel(p.rollType))
                     row.choiceText:SetTextColor(rc.r, rc.g, rc.b)
                     row.choiceText:Show()
@@ -950,13 +1019,13 @@ function RollTrackerFrame:UpdatePlayerRows()
             else
                 if iconPath then
                     row.choiceIcon:ClearAllPoints()
-                    row.choiceIcon:SetPoint("LEFT", row, "LEFT", 222, 0)
+                    row.choiceIcon:SetPoint("LEFT", row, "LEFT", 220, 0)
                     row.choiceIcon:SetTexture(iconPath)
                     row.choiceIcon:Show()
 
                     row.choiceText:ClearAllPoints()
                     row.choiceText:SetPoint("LEFT", row.choiceIcon, "RIGHT", 4, 0)
-                    row.choiceText:SetWidth(76)
+                    row.choiceText:SetWidth(68)
                     row.choiceText:SetText(DataTracker:GetRollTypeLabel(p.rollType))
                     row.choiceText:SetTextColor(rc.r, rc.g, rc.b)
                     row.choiceText:Show()
@@ -1029,13 +1098,48 @@ function RollTrackerFrame:Refresh(isNewRoll)
 
     -- Item Header (use plain itemName colored by quality, without hyperlink [brackets])
     frame.itemIcon:SetTexture(session.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
+    if session.isRandomRoll then
+        frame.itemIcon:SetTexCoord(0, 1, 0, 1)
+    else
+        frame.itemIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    end
     local r, g, b = ns.GetItemQualityColor(session.itemQuality or 2)
+    if session.isRandomRoll then
+        r, g, b = 1.0, 0.85, 0.25
+    end
     local cleanName = session.itemName
     if (not cleanName or cleanName == "") and session.itemLink then
         cleanName = session.itemLink:match("%[(.-)%]") or session.itemLink
     end
     frame.itemTitle:SetText(cleanName or "Item")
     frame.itemTitle:SetTextColor(r or 1, g or 1, b or 1)
+
+    -- Show/Hide Random Roll Dice & Restart Session header buttons
+    if frame.rollDiceBtn and frame.restartRollBtn and frame.itemHeader then
+        if session.isRandomRoll then
+            local alreadyRolled = DataTracker:HasLocalPlayerRolled(session.rollID)
+            if alreadyRolled then
+                frame.rollDiceBtn.icon:SetDesaturated(true)
+                frame.rollDiceBtn.icon:SetAlpha(0.45)
+                if frame.rollDiceBtn.SetBackdropBorderColor then
+                    frame.rollDiceBtn:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.8)
+                end
+            else
+                frame.rollDiceBtn.icon:SetDesaturated(false)
+                frame.rollDiceBtn.icon:SetAlpha(1.0)
+                if frame.rollDiceBtn.SetBackdropBorderColor then
+                    frame.rollDiceBtn:SetBackdropBorderColor(0.35, 0.85, 0.35, 0.95)
+                end
+            end
+            frame.restartRollBtn:Show()
+            frame.rollDiceBtn:Show()
+            frame.itemHeader:SetPoint("TOPRIGHT", frame.rollDiceBtn, "TOPLEFT", -4, 0)
+        else
+            frame.restartRollBtn:Hide()
+            frame.rollDiceBtn:Hide()
+            frame.itemHeader:SetPoint("TOPRIGHT", frame.closeBtn, "TOPLEFT", -2, 0)
+        end
+    end
 
     -- Evaluate Player List & Leaders
     local eval = DataTracker:EvaluateSession(session)

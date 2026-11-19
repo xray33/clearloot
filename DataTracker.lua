@@ -9,10 +9,12 @@ DataTracker.ROLL_TYPE_PASS = 0
 DataTracker.ROLL_TYPE_NEED = 1
 DataTracker.ROLL_TYPE_GREED = 2
 DataTracker.ROLL_TYPE_DISENCHANT = 3
+DataTracker.ROLL_TYPE_RANDOM = 4
 DataTracker.ROLL_TYPE_PENDING = -1
 
 -- Priority order for sorting and provisional winner calculation (higher = higher priority)
 local ROLL_PRIORITY = {
+    [DataTracker.ROLL_TYPE_RANDOM] = 4,
     [DataTracker.ROLL_TYPE_NEED] = 4,
     [DataTracker.ROLL_TYPE_GREED] = 3,
     [DataTracker.ROLL_TYPE_DISENCHANT] = 2,
@@ -30,6 +32,8 @@ local dismissedRolls = {}
 local currentRollID = nil
 
 local chatPatterns = {}
+local randomRollPattern = nil
+local randomRollCounter = 0
 
 -- Convert a Blizzard format string (e.g. LOOT_ROLL_ROLLED_NEED = "%s rolls %d (%s)" or "%3$s rolls %1$d for %2$s")
 -- into a Lua pattern + ordered capture map
@@ -111,6 +115,10 @@ local function BuildChatPatterns()
     AddCompletionGlobal("LOOT_ROLL_WON", { "player", "item" }, false)
     AddCompletionGlobal("LOOT_ROLL_YOU_WON", { "item" }, true)
     AddCompletionGlobal("LOOT_ROLL_ALL_PASSED", { "item" }, false)
+
+    -- Standard /roll pattern from RANDOM_ROLL_RESULT (e.g. "%s rolls %d (%d-%d)")
+    local rawRandomRoll = _G.RANDOM_ROLL_RESULT or "%s rolls %d (%d-%d)"
+    randomRollPattern = CreatePatternFromGlobalString(rawRandomRoll, { "player", "roll", "min", "max" })
 end
 
 function DataTracker:GetRollTypeLabel(rollType)
@@ -122,6 +130,8 @@ function DataTracker:GetRollTypeLabel(rollType)
         return L.ROLL_DISENCHANT
     elseif rollType == self.ROLL_TYPE_PASS then
         return L.ROLL_PASS
+    elseif rollType == self.ROLL_TYPE_RANDOM then
+        return L.ROLL_RANDOM or "Roll"
     else
         return L.ROLL_PENDING
     end
@@ -316,6 +326,7 @@ function DataTracker:CreateOrUpdateRollSession(rollID, data)
         if data.count then session.count = data.count end
         if data.isDone ~= nil then session.isDone = data.isDone end
         if data.isSimulated ~= nil then session.isSimulated = data.isSimulated end
+        if data.isRandomRoll ~= nil then session.isRandomRoll = data.isRandomRoll end
     end
 
     -- Populate initial eligible group roster if new real roll
@@ -447,7 +458,7 @@ function DataTracker:EvaluateSession(session)
     local anyNonPass = false
 
     for _, p in ipairs(sortedPlayers) do
-        if p.rollType == self.ROLL_TYPE_NEED or p.rollType == self.ROLL_TYPE_GREED or p.rollType == self.ROLL_TYPE_DISENCHANT then
+        if p.rollType == self.ROLL_TYPE_NEED or p.rollType == self.ROLL_TYPE_GREED or p.rollType == self.ROLL_TYPE_DISENCHANT or p.rollType == self.ROLL_TYPE_RANDOM then
             anyNonPass = true
             local score = p.rollScore or 0
             if not bestType then
@@ -471,7 +482,7 @@ function DataTracker:EvaluateSession(session)
         if p.rollType == self.ROLL_TYPE_PENDING then
             allScoresIn = false
             break
-        elseif (p.rollType == self.ROLL_TYPE_NEED or p.rollType == self.ROLL_TYPE_GREED or p.rollType == self.ROLL_TYPE_DISENCHANT) and not p.rollScore then
+        elseif (p.rollType == self.ROLL_TYPE_NEED or p.rollType == self.ROLL_TYPE_GREED or p.rollType == self.ROLL_TYPE_DISENCHANT or p.rollType == self.ROLL_TYPE_RANDOM) and not p.rollScore then
             allScoresIn = false
             break
         end
@@ -746,6 +757,179 @@ function DataTracker:OnChatMsgLoot(msg)
     end
 end
 
+function DataTracker:ScheduleRandomRollTimeout(rollID)
+    local session = rollsByID[rollID]
+    if not session or not session.isRandomRoll or session.isDone or session.isClosed then
+        return
+    end
+
+    local timeout = (ns.db and tonumber(ns.db.randomRollTimeout)) or 30
+    if timeout <= 0 then
+        timeout = 30
+    end
+
+    session._randomTimeoutGen = (session._randomTimeoutGen or 0) + 1
+    local gen = session._randomTimeoutGen
+    session.timeoutAt = GetTime() + timeout
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(timeout, function()
+            local s = rollsByID[rollID]
+            if not s or s._randomTimeoutGen ~= gen or s.isDone or s.isClosed then
+                return
+            end
+            s.isDone = true
+            self:NotifyUI()
+        end)
+    end
+end
+
+function DataTracker:GetActiveRandomRollSession()
+    for i = #activeRollOrder, 1, -1 do
+        local id = activeRollOrder[i]
+        local s = rollsByID[id]
+        if s and s.isRandomRoll and not s.isSimulated and not s.isClosed and not s.isDone and not dismissedRolls[id] then
+            local eval = self:EvaluateSession(s)
+            if not (eval and eval.isComplete) then
+                return s
+            end
+        end
+    end
+    return nil
+end
+
+function DataTracker:HasPlayerRolledInSession(rollID, playerName)
+    local session = rollsByID[rollID]
+    if not session or not playerName then return false end
+
+    local shortName = ns.RosterInspector:GetShortName(playerName)
+    local entry = session.players[shortName]
+    if not entry and ns.IsForever then
+        local firstWord = shortName:match("^([^%s]+)")
+        if firstWord then
+            for existingKey, existingEntry in pairs(session.players) do
+                if existingKey == firstWord or existingKey:match("^([^%s]+)%s+.+$") == firstWord then
+                    entry = existingEntry
+                    break
+                end
+            end
+        end
+    end
+
+    return (entry and entry.rollType == self.ROLL_TYPE_RANDOM and entry.rollScore ~= nil) or false
+end
+
+function DataTracker:HasLocalPlayerRolled(rollID)
+    local myDisplayName = ns.RosterInspector:GetUnitNames("player")
+    if not myDisplayName then return false end
+    return self:HasPlayerRolledInSession(rollID, myDisplayName)
+end
+
+function DataTracker:RestartRandomRollSession(rollID)
+    local session = rollsByID[rollID]
+    if not session or not session.isRandomRoll then return end
+
+    session.isDone = false
+    session.isClosed = false
+    session.completedAt = nil
+    session.startedAt = GetTime()
+    session._autoCloseGen = (session._autoCloseGen or 0) + 1
+    dismissedRolls[rollID] = nil
+
+    if session.isSimulated then
+        for _, p in pairs(session.players) do
+            p.rollType = self.ROLL_TYPE_PENDING
+            p.rollScore = nil
+        end
+    else
+        session.players = {}
+        local members = ns.RosterInspector:GetEligibleGroupMembers()
+        for _, m in ipairs(members) do
+            local short = ns.RosterInspector:GetShortName(m.name)
+            session.players[short] = {
+                name = short,
+                fullName = m.fullName,
+                class = m.class,
+                role = m.role,
+                rollType = self.ROLL_TYPE_PENDING,
+                rollScore = nil,
+            }
+        end
+    end
+
+    self:ScheduleRandomRollTimeout(rollID)
+    self:NotifyUI()
+end
+
+function DataTracker:OnChatMsgSystem(msg)
+    if not msg or ns.IsSecretValue(msg) or type(msg) ~= "string" or msg == "" then return end
+    if not randomRollPattern then return end
+
+    local inGroup = (IsInGroup and IsInGroup()) or (IsInRaid and IsInRaid())
+    if inGroup then
+        if ns.db and not ns.db.trackRandomRolls then
+            return
+        end
+    else
+        if not (ns.db and ns.db.trackSoloRandomRolls) then
+            return
+        end
+    end
+
+    local c1, c2, c3, c4 = msg:match(randomRollPattern.pattern)
+    if not c1 then return end
+
+    local captures = { c1, c2, c3, c4 }
+    local parsed = {}
+    for idx, key in ipairs(randomRollPattern.order) do
+        parsed[key] = captures[idx]
+    end
+
+    local playerName = parsed.player
+    local rollScore = tonumber(parsed.roll)
+    local minRoll = tonumber(parsed.min)
+    local maxRoll = tonumber(parsed.max)
+
+    -- 1. Accept ONLY standard 1-100 rolls
+    if not playerName or not rollScore or minRoll ~= 1 or maxRoll ~= 100 then
+        return
+    end
+
+    -- 2. Accept ONLY from current group/raid members (or self if solo mode enabled)
+    local unit = ns.RosterInspector:FindUnitByName(playerName)
+    if not unit then
+        return
+    end
+
+    -- 3. Find or create the active Random Roll (1-100) session
+    local session = self:GetActiveRandomRollSession()
+    local isNewRoll = false
+    if not session then
+        randomRollCounter = randomRollCounter + 1
+        local rollID = "RANDOM_" .. randomRollCounter
+        session = self:CreateOrUpdateRollSession(rollID, {
+            itemName = L.RANDOM_ROLL_TITLE or "Random Roll (1-100)",
+            itemTexture = "Interface\\Buttons\\UI-GroupLoot-Dice-Up",
+            itemQuality = 1,
+            count = 1,
+            isDone = false,
+            isSimulated = false,
+            isRandomRoll = true,
+        })
+        currentRollID = rollID
+        isNewRoll = true
+    end
+
+    -- 4. Accept ONLY the 1st roll of each member per session
+    if self:HasPlayerRolledInSession(session.rollID, playerName) then
+        return
+    end
+
+    self:SetPlayerRoll(session.rollID, playerName, nil, self.ROLL_TYPE_RANDOM, rollScore)
+    self:ScheduleRandomRollTimeout(session.rollID)
+    self:NotifyUI(isNewRoll)
+end
+
 function DataTracker:ClearSimulatedRolls()
     local keptOrder = {}
     for _, id in ipairs(activeRollOrder) do
@@ -811,5 +995,9 @@ function DataTracker:Init()
 
     ns:RegisterEvent("CHAT_MSG_LOOT", function(_, msg)
         DataTracker:OnChatMsgLoot(msg)
+    end)
+
+    ns:RegisterEvent("CHAT_MSG_SYSTEM", function(_, msg)
+        DataTracker:OnChatMsgSystem(msg)
     end)
 end

@@ -20,6 +20,9 @@ local DEFAULT_SETTINGS = {
     hidePending = false,
     choiceDisplay = "ICONS", -- "ICONS", "TEXT", or "BOTH"
     autoCloseDelay = 5,      -- 3, 5, 10, 15 (seconds), or 0 (Never)
+    trackRandomRolls = true, -- Track standard /roll (1-100) from group/raid members
+    trackSoloRandomRolls = false, -- Track own /roll (1-100) when not in a group
+    randomRollTimeout = 30,  -- 15, 20, 30, 45, 60 (seconds)
     windowOpacity = 100,     -- 20..100 (%)
     windowScale = 100,       -- 60..160 (%)
     anchorSide = "RIGHT",    -- "RIGHT", "LEFT", or "FREE"
@@ -154,6 +157,10 @@ local function ExecuteSlashCommand(msg)
         if ns.Simulator then
             ns.Simulator:StartRaidTest(40)
         end
+    elseif cmd == "testroll" or cmd == "roll" then
+        if ns.Simulator and ns.Simulator.StartRandomRollTest then
+            ns.Simulator:StartRandomRollTest()
+        end
     elseif cmd == "stop" or cmd == "clear" then
         if ns.Simulator then
             ns.Simulator:StopTests()
@@ -182,6 +189,9 @@ local function ExecuteSlashCommand(msg)
         ns:Print(L.SLASH_HELP_TEST)
         ns:Print(L.SLASH_HELP_TESTMULTI)
         ns:Print(L.SLASH_HELP_TESTRAID)
+        if L.SLASH_HELP_TESTROLL then
+            ns:Print(L.SLASH_HELP_TESTROLL)
+        end
         ns:Print(L.SLASH_HELP_STOP)
         ns:Print(L.SLASH_HELP_SHOW)
         if L.SLASH_HELP_MOVE then

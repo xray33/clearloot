@@ -280,44 +280,48 @@ function SettingsModule:Init()
     subtitle:SetJustifyH("LEFT")
     subtitle:SetText(L.ADDON_SUBTITLE)
 
-    local y = -64
+    local y = -58
 
-    CreateCheckbox(panel, L.SETTINGS_ENABLE, L.SETTINGS_ENABLE_DESC, "enabled", y, function()
+    -- Two-column general checkboxes to save vertical space cleanly
+    local cb1 = CreateCheckbox(panel, L.SETTINGS_ENABLE, L.SETTINGS_ENABLE_DESC, "enabled", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 28
 
-    CreateCheckbox(panel, L.SETTINGS_AUTO_OPEN, L.SETTINGS_AUTO_OPEN_DESC, "autoOpen", y)
-    y = y - 28
+    local cb2 = CreateCheckbox(panel, L.SETTINGS_AUTO_OPEN, L.SETTINGS_AUTO_OPEN_DESC, "autoOpen", y)
+    cb2:ClearAllPoints()
+    cb2:SetPoint("TOPLEFT", 286, y)
+    y = y - 26
 
-    CreateCheckbox(panel, L.SETTINGS_SHOW_ROLE, L.SETTINGS_SHOW_ROLE_DESC, "showRoleIcons", y, function()
+    local cb3 = CreateCheckbox(panel, L.SETTINGS_SHOW_ROLE, L.SETTINGS_SHOW_ROLE_DESC, "showRoleIcons", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 28
 
-    CreateCheckbox(panel, L.SETTINGS_AUTO_SWITCH, L.SETTINGS_AUTO_SWITCH_DESC, "autoSwitchOnHover", y)
-    y = y - 28
+    local cb4 = CreateCheckbox(panel, L.SETTINGS_AUTO_SWITCH, L.SETTINGS_AUTO_SWITCH_DESC, "autoSwitchOnHover", y)
+    cb4:ClearAllPoints()
+    cb4:SetPoint("TOPLEFT", 286, y)
+    y = y - 26
 
-    CreateCheckbox(panel, L.SETTINGS_KEEP_AFTER_ROLL, L.SETTINGS_KEEP_AFTER_ROLL_DESC, "keepOpenAfterMyRoll", y)
-    y = y - 28
+    local cb5 = CreateCheckbox(panel, L.SETTINGS_KEEP_AFTER_ROLL, L.SETTINGS_KEEP_AFTER_ROLL_DESC, "keepOpenAfterMyRoll", y)
 
-    CreateCheckbox(panel, L.SETTINGS_HIDE_PASS, L.SETTINGS_HIDE_PASS_DESC, "hidePassed", y, function()
+    local cb6 = CreateCheckbox(panel, L.SETTINGS_HIDE_PASS, L.SETTINGS_HIDE_PASS_DESC, "hidePassed", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 28
+    cb6:ClearAllPoints()
+    cb6:SetPoint("TOPLEFT", 286, y)
+    y = y - 26
 
     CreateCheckbox(panel, L.SETTINGS_HIDE_PENDING, L.SETTINGS_HIDE_PENDING_DESC, "hidePending", y, function()
         if ns.RollTrackerFrame then
             ns.RollTrackerFrame:Refresh()
         end
     end)
-    y = y - 36
+    y = y - 34
 
     -- Row 1: Choice Column Display (Left) & Auto-Close Window (Right)
     local CHOICE_OPTIONS = {
@@ -459,17 +463,63 @@ function SettingsModule:Init()
         end
     )
 
-    y = y - 60
+    y = y - 56
 
-    -- Row 4: Solo Testing & Simulation Section
+    -- Row 4: Random Rolls (/roll 1-100) Section
+    local randomDivider = panel:CreateTexture(nil, "ARTWORK")
+    randomDivider:SetHeight(1)
+    randomDivider:SetPoint("TOPLEFT", 18, y + 6)
+    randomDivider:SetPoint("TOPRIGHT", -18, y + 6)
+    randomDivider:SetColorTexture(0.5, 0.5, 0.5, 0.25)
+
+    local randomHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    randomHeader:SetPoint("TOPLEFT", 20, y - 4)
+    randomHeader:SetText(L.SETTINGS_RANDOM_HEADER or "Random Rolls (/roll 1-100)")
+
+    y = y - 24
+
+    CreateCheckbox(panel, L.SETTINGS_RANDOM_ENABLE, L.SETTINGS_RANDOM_ENABLE_DESC, "trackRandomRolls", y)
+    y = y - 26
+
+    CreateCheckbox(panel, L.SETTINGS_RANDOM_SOLO, L.SETTINGS_RANDOM_SOLO_DESC, "trackSoloRandomRolls", y)
+
+    local RANDOM_TIMEOUT_OPTIONS = {
+        { value = 15, text = L.SETTINGS_RANDOM_TIMEOUT_15S or "15 Seconds" },
+        { value = 20, text = L.SETTINGS_RANDOM_TIMEOUT_20S or "20 Seconds" },
+        { value = 30, text = L.SETTINGS_RANDOM_TIMEOUT_30S or "30 Seconds (Default)" },
+        { value = 45, text = L.SETTINGS_RANDOM_TIMEOUT_45S or "45 Seconds" },
+        { value = 60, text = L.SETTINGS_RANDOM_TIMEOUT_60S or "60 Seconds" },
+    }
+    CreateDropdown(
+        panel,
+        "ClearLootRandomTimeoutDropDown",
+        L.SETTINGS_RANDOM_TIMEOUT or "Random Roll Timeout",
+        L.SETTINGS_RANDOM_TIMEOUT_DESC,
+        290,
+        y + 20,
+        210,
+        RANDOM_TIMEOUT_OPTIONS,
+        "randomRollTimeout",
+        30
+    )
+
+    y = y - 42
+
+    -- Row 5: Solo Testing & Simulation Section
+    local testDivider = panel:CreateTexture(nil, "ARTWORK")
+    testDivider:SetHeight(1)
+    testDivider:SetPoint("TOPLEFT", 18, y + 6)
+    testDivider:SetPoint("TOPRIGHT", -18, y + 6)
+    testDivider:SetColorTexture(0.5, 0.5, 0.5, 0.25)
+
     local testHeader = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    testHeader:SetPoint("TOPLEFT", 20, y)
+    testHeader:SetPoint("TOPLEFT", 20, y - 4)
     testHeader:SetText(L.SETTINGS_TEST_HEADER)
 
-    y = y - 22
+    y = y - 24
 
     local testSingleBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    testSingleBtn:SetSize(165, 26)
+    testSingleBtn:SetSize(130, 26)
     testSingleBtn:SetPoint("TOPLEFT", 20, y)
     testSingleBtn:SetText(L.SETTINGS_TEST_SINGLE_BTN)
     testSingleBtn:SetScript("OnClick", function()
@@ -482,8 +532,8 @@ function SettingsModule:Init()
     end)
 
     local testMultiBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    testMultiBtn:SetSize(165, 26)
-    testMultiBtn:SetPoint("LEFT", testSingleBtn, "RIGHT", 10, 0)
+    testMultiBtn:SetSize(130, 26)
+    testMultiBtn:SetPoint("LEFT", testSingleBtn, "RIGHT", 8, 0)
     testMultiBtn:SetText(L.SETTINGS_TEST_MULTI_BTN)
     testMultiBtn:SetScript("OnClick", function()
         if ns.Simulator then
@@ -495,12 +545,25 @@ function SettingsModule:Init()
     end)
 
     local testRaidBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    testRaidBtn:SetSize(165, 26)
-    testRaidBtn:SetPoint("LEFT", testMultiBtn, "RIGHT", 10, 0)
+    testRaidBtn:SetSize(130, 26)
+    testRaidBtn:SetPoint("LEFT", testMultiBtn, "RIGHT", 8, 0)
     testRaidBtn:SetText(L.SETTINGS_TEST_RAID_BTN)
     testRaidBtn:SetScript("OnClick", function()
         if ns.Simulator then
             local ok, err = pcall(ns.Simulator.StartRaidTest, ns.Simulator, 40)
+            if not ok then
+                ns:Print("|cffff4444Simulation error:|r " .. tostring(err))
+            end
+        end
+    end)
+
+    local testRandomBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    testRandomBtn:SetSize(130, 26)
+    testRandomBtn:SetPoint("LEFT", testRaidBtn, "RIGHT", 8, 0)
+    testRandomBtn:SetText(L.SETTINGS_TEST_RANDOM_BTN or "Test /roll (1-100)")
+    testRandomBtn:SetScript("OnClick", function()
+        if ns.Simulator and ns.Simulator.StartRandomRollTest then
+            local ok, err = pcall(ns.Simulator.StartRandomRollTest, ns.Simulator)
             if not ok then
                 ns:Print("|cffff4444Simulation error:|r " .. tostring(err))
             end

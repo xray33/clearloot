@@ -247,6 +247,71 @@ function Simulator:StartMultiTest()
     ns:Print(string.format(L.MSG_SIM_STARTED, #MOCK_ITEMS))
 end
 
+function Simulator:StartRandomRollTest()
+    CancelAllTimers()
+    DataTracker:ClearSimulatedRolls()
+
+    simCounter = simCounter + 1
+    local rollID = "SIM_RANDOM_" .. simCounter
+
+    DataTracker:CreateOrUpdateRollSession(rollID, {
+        itemName = L.RANDOM_ROLL_TITLE or "Random Roll (1-100)",
+        itemTexture = "Interface\\Buttons\\UI-GroupLoot-Dice-Up",
+        itemQuality = 1,
+        count = 1,
+        isDone = false,
+        isSimulated = true,
+        isRandomRoll = true,
+    })
+
+    local myDisplayName = ns.RosterInspector:GetUnitNames("player")
+    local myName = (myDisplayName and myDisplayName ~= "") and myDisplayName or (ns.IsForever and "Player Hero" or "Player")
+    local _, rawClass = UnitClass("player")
+    local myClass = (rawClass and not ns.IsSecretValue(rawClass)) and rawClass or "PALADIN"
+    local myRole = (UnitGroupRolesAssigned and UnitGroupRolesAssigned("player")) or "DAMAGER"
+    if ns.IsSecretValue(myRole) or myRole == "NONE" then myRole = "DAMAGER" end
+
+    local roster = {
+        { name = myName, class = myClass or "PALADIN", role = myRole, isMe = true },
+    }
+    local namePool = ns.IsForever and MOCK_RAID_NAMES_FOREVER or MOCK_RAID_NAMES_CLASSIC
+    for i = 1, #namePool do
+        if #roster >= 5 then break end
+        local name = namePool[i]
+        if name ~= myName then
+            table.insert(roster, {
+                name = name,
+                class = MOCK_CLASSES[((i - 1) % #MOCK_CLASSES) + 1],
+                role = MOCK_ROLES[((i - 1) % #MOCK_ROLES) + 1],
+            })
+        end
+    end
+
+    for _, p in ipairs(roster) do
+        DataTracker:SetPlayerRoll(rollID, p.name, p.class, DataTracker.ROLL_TYPE_PENDING, nil, p.role)
+    end
+
+    -- Stagger simulated party members' /roll (1-100), leaving the local player unrolled so they can click the Dice button
+    for idx, p in ipairs(roster) do
+        if not p.isMe then
+            local delay = (idx - 1) * 1.1 + (math.random() * 0.3)
+            ScheduleTimer(delay, function()
+                local current = DataTracker:GetRollSession(rollID)
+                if not current or current.isClosed then return end
+                if DataTracker:HasPlayerRolledInSession(rollID, p.name) then return end
+
+                local score = math.random(1, 100)
+                DataTracker:SetPlayerRoll(rollID, p.name, p.class, DataTracker.ROLL_TYPE_RANDOM, score, p.role)
+                DataTracker:NotifyUI()
+            end)
+        end
+    end
+
+    DataTracker:ScheduleRandomRollTimeout(rollID)
+    DataTracker:SetCurrentRollID(rollID, true)
+    ns:Print(L.MSG_SIM_RANDOM_STARTED or "Started simulated /roll (1-100) session.")
+end
+
 function Simulator:StopTests()
     CancelAllTimers()
     DataTracker:ClearSimulatedRolls()
