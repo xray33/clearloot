@@ -184,19 +184,144 @@ local function ShowPlayerContextMenu(playerData, anchorFrame)
     ToggleDropDownMenu(1, nil, dropdownFrame, "cursor", 0, 0)
 end
 
-local function ApplyClassicBackdrop(frame, bgAlpha)
-    if frame.SetBackdrop then
-        frame:SetBackdrop({
-            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true,
-            tileSize = 16,
-            edgeSize = 16,
-            insets = { left = 4, right = 4, top = 4, bottom = 4 },
-        })
-        frame:SetBackdropColor(0.06, 0.06, 0.08, bgAlpha or 0.92)
-        frame:SetBackdropBorderColor(0.85, 0.75, 0.55, 1.0)
+local THEMES = {
+    FOREVER = {
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+        bgColor = { 0.09, 0.08, 0.07, 0.94 },
+        borderColor = { 0.76, 0.62, 0.42, 1.0 },
+        dividerColor = { 0.58, 0.48, 0.35, 0.45 },
+        footerTextColor = { 0.86, 0.75, 0.56 },
+        scrollThumbColor = { 0.76, 0.62, 0.42, 0.85 },
+        tabEdgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tabEdgeSize = 12,
+        tabInsets = { left = 2, right = 2, top = 2, bottom = 2 },
+        tabBgColor = { 0.10, 0.09, 0.08, 0.94 },
+        tabActiveBorder = { 0.92, 0.78, 0.52, 1.0 },
+        tabInactiveBorder = { 0.52, 0.43, 0.31, 0.85 },
+        btnBgColor = { 0.14, 0.12, 0.10, 0.92 },
+        btnBorderColor = { 0.72, 0.58, 0.40, 0.95 },
+    },
+    CLASSIC = {
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+        bgColor = { 0.06, 0.06, 0.08, 0.94 },
+        borderColor = { 1.00, 1.00, 1.00, 1.0 },
+        dividerColor = { 0.70, 0.58, 0.32, 0.50 },
+        footerTextColor = { 1.00, 0.82, 0.00 },
+        scrollThumbColor = { 0.90, 0.75, 0.35, 0.80 },
+        tabEdgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tabEdgeSize = 10,
+        tabInsets = { left = 2, right = 2, top = 2, bottom = 2 },
+        tabBgColor = { 0.08, 0.08, 0.08, 0.92 },
+        tabActiveBorder = { 1.00, 0.82, 0.00, 1.0 },
+        tabInactiveBorder = { 0.50, 0.50, 0.50, 0.80 },
+        btnBgColor = { 0.12, 0.12, 0.16, 0.90 },
+        btnBorderColor = { 0.75, 0.65, 0.40, 0.90 },
+    },
+    MINIMALIST = {
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        tile = false,
+        tileSize = 0,
+        edgeSize = 1,
+        insets = { left = 1, right = 1, top = 1, bottom = 1 },
+        bgColor = { 0.06, 0.06, 0.06, 0.92 },
+        borderColor = { 0.18, 0.18, 0.20, 1.0 },
+        dividerColor = { 0.24, 0.24, 0.26, 0.75 },
+        footerTextColor = { 0.78, 0.78, 0.80 },
+        scrollThumbColor = { 0.50, 0.50, 0.54, 0.85 },
+        tabEdgeFile = "Interface\\Buttons\\WHITE8X8",
+        tabEdgeSize = 1,
+        tabInsets = { left = 1, right = 1, top = 1, bottom = 1 },
+        tabBgColor = { 0.07, 0.07, 0.08, 0.94 },
+        tabActiveBorder = { 0.88, 0.88, 0.92, 1.0 },
+        tabInactiveBorder = { 0.22, 0.22, 0.25, 0.90 },
+        btnBgColor = { 0.10, 0.10, 0.11, 0.92 },
+        btnBorderColor = { 0.28, 0.28, 0.32, 0.95 },
+    },
+    -- Authentic EllesmereUI in-game frame style:
+    -- Pitch-black 2px border + outer drop shadow on a deep matte charcoal panel
+    ELLESMERE = {
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        tile = false,
+        tileSize = 0,
+        edgeSize = 2,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+        hasShadow = true,
+        bgColor = { 0.07, 0.07, 0.08, 0.95 },
+        borderColor = { 0.00, 0.00, 0.00, 1.0 },
+        dividerColor = { 0.18, 0.18, 0.20, 0.85 },
+        footerTextColor = { 0.85, 0.85, 0.88 },
+        scrollThumbColor = { 0.38, 0.38, 0.42, 0.90 },
+        tabEdgeFile = "Interface\\Buttons\\WHITE8X8",
+        tabEdgeSize = 2,
+        tabInsets = { left = 2, right = 2, top = 2, bottom = 2 },
+        tabBgColor = { 0.07, 0.07, 0.08, 0.95 },
+        tabActiveBorder = { 0.00, 0.00, 0.00, 1.0 },
+        tabInactiveBorder = { 0.00, 0.00, 0.00, 0.85 },
+        btnBgColor = { 0.11, 0.11, 0.13, 0.95 },
+        btnBorderColor = { 0.00, 0.00, 0.00, 1.0 },
+    },
+    -- Authentic FlareUI style from malkkav/FlareUI (Chat & Damage Meter modules):
+    -- Flat dark translucent panel background paired with "FlareUI Thin" 10px native Forever bronze border
+    FLARE = {
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = false,
+        tileSize = 0,
+        edgeSize = 10,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 },
+        bgColor = { 0.06, 0.06, 0.07, 0.88 },
+        borderColor = { 0.68, 0.55, 0.37, 0.95 },
+        dividerColor = { 0.68, 0.55, 0.37, 0.40 },
+        footerTextColor = { 0.88, 0.74, 0.50 },
+        scrollThumbColor = { 0.74, 0.60, 0.40, 0.85 },
+        tabEdgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tabEdgeSize = 10,
+        tabInsets = { left = 2, right = 2, top = 2, bottom = 2 },
+        tabBgColor = { 0.06, 0.06, 0.07, 0.92 },
+        tabActiveBorder = { 0.90, 0.75, 0.48, 1.0 },
+        tabInactiveBorder = { 0.46, 0.37, 0.26, 0.85 },
+        btnBgColor = { 0.10, 0.09, 0.08, 0.92 },
+        btnBorderColor = { 0.68, 0.55, 0.37, 0.95 },
+    },
+}
+
+function RollTrackerFrame:SyncEllesmereTheme(S)
+    local eui = THEMES.ELLESMERE
+    if not eui or type(S) ~= "table" then return end
+    if type(S.GetPanelColor) == "function" then
+        local pr, pg, pb, pa = S.GetPanelColor()
+        if pr and pg and pb then
+            eui.bgColor = { pr, pg, pb, pa or 0.95 }
+            eui.tabBgColor = { pr, pg, pb, pa or 0.95 }
+        end
     end
+    if self:GetThemeKey() == "ELLESMERE" then
+        self:ApplyTheme()
+    end
+end
+
+function RollTrackerFrame:GetThemeKey()
+    local key = ns.db and ns.db.theme or "FOREVER"
+    if not THEMES[key] then
+        key = "FOREVER"
+    end
+    return key
+end
+
+function RollTrackerFrame:GetTheme()
+    return THEMES[self:GetThemeKey()] or THEMES.FOREVER
 end
 
 local function CreateItemTab(parent, index)
@@ -344,13 +469,31 @@ local function CreatePlayerRow(parent, index)
         end
     end)
 
+    row:RegisterForDrag("LeftButton")
+    row:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" and not IsShiftKeyDown() then
+            RollTrackerFrame:StartDragging()
+        end
+    end)
+    row:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StopDragging()
+        end
+    end)
+    row:SetScript("OnDragStart", function()
+        RollTrackerFrame:StartDragging()
+    end)
+    row:SetScript("OnDragStop", function()
+        RollTrackerFrame:StopDragging()
+    end)
+
     row:EnableMouseWheel(true)
     row:SetScript("OnMouseWheel", function(_, delta)
         RollTrackerFrame:OnMouseWheel(delta)
     end)
 
     row:SetScript("OnEnter", function(self)
-        if not self.playerData then return end
+        if RollTrackerFrame.isDragging or not self.playerData then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         local colored = ns.RosterInspector:ColorizeName(self.playerData.name, self.playerData.class)
         GameTooltip:SetText(colored)
@@ -387,6 +530,51 @@ function RollTrackerFrame:OnMouseWheel(delta)
     end
 end
 
+function RollTrackerFrame:StartDragging()
+    local frame = self.frame
+    if not frame or self.isDragging then return end
+    self.isDragging = true
+    GameTooltip:Hide()
+    frame:StartMoving()
+end
+
+function RollTrackerFrame:StopDragging()
+    local frame = self.frame
+    if not frame or not self.isDragging then return end
+    frame:StopMovingOrSizing()
+    self.isDragging = false
+    local point, _, relativePoint, x, y = frame:GetPoint(1)
+    if point then
+        ns.db.anchorSide = "FREE"
+        ns.db.freePosition = {
+            point = point,
+            relativePoint = relativePoint,
+            x = x,
+            y = y,
+        }
+    end
+    if self._pendingRefresh then
+        self._pendingRefresh = false
+        self:Refresh()
+    end
+end
+
+function RollTrackerFrame:UpdateHeaderHitRect()
+    local frame = self.frame
+    if not frame or not frame.itemHeader or not frame.itemTitle then return end
+
+    local winWidth = self:GetWindowWidth()
+    local rightReserved = (frame.rollDiceBtn and frame.rollDiceBtn:IsShown()) and 84 or 34
+    local maxHeaderWidth = math.max(60, winWidth - 10 - rightReserved)
+
+    local textWidth = frame.itemTitle:GetStringWidth() or 0
+    if textWidth <= 0 then
+        textWidth = maxHeaderWidth
+    end
+    local contentWidth = math.min(maxHeaderWidth, math.max(48, 20 + 6 + math.ceil(textWidth) + 4))
+    frame.itemHeader:SetWidth(contentWidth)
+end
+
 function RollTrackerFrame:Init()
     local frame = CreateFrame("Frame", "ClearLootTrackerFrame", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
     frame:SetSize(self:GetWindowWidth(), HEADER_HEIGHT + (MIN_VISIBLE_ROWS * ROW_HEIGHT) + FOOTER_HEIGHT)
@@ -397,7 +585,6 @@ function RollTrackerFrame:Init()
     frame:EnableMouseWheel(true)
     frame:SetMovable(true)
     frame:RegisterForDrag("LeftButton")
-    ApplyClassicBackdrop(frame, 0.94)
 
     frame.scrollOffset = 0
     frame.maxScrollOffset = 0
@@ -405,21 +592,26 @@ function RollTrackerFrame:Init()
         RollTrackerFrame:OnMouseWheel(delta)
     end)
 
-    frame:SetScript("OnDragStart", function(self)
-        self:StartMoving()
+    frame:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StartDragging()
+        end
+    end)
+    frame:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StopDragging()
+        end
+    end)
+    frame:SetScript("OnDragStart", function()
+        RollTrackerFrame:StartDragging()
     end)
 
-    frame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local point, _, relativePoint, x, y = self:GetPoint(1)
-        if point then
-            ns.db.anchorSide = "FREE"
-            ns.db.freePosition = {
-                point = point,
-                relativePoint = relativePoint,
-                x = x,
-                y = y,
-            }
+    frame:SetScript("OnDragStop", function()
+        RollTrackerFrame:StopDragging()
+    end)
+    frame:SetScript("OnHide", function()
+        if RollTrackerFrame.isDragging then
+            RollTrackerFrame:StopDragging()
         end
     end)
 
@@ -563,11 +755,10 @@ function RollTrackerFrame:Init()
     rollDiceBtn:Hide()
     frame.rollDiceBtn = rollDiceBtn
 
-    -- Item Header Button (Icon + Item Link/Name, hoverable for item tooltip)
+    -- Item Header Button (Icon + Item Link/Name, sized tightly to icon + text for tooltip)
     local itemHeader = CreateFrame("Button", nil, frame)
     itemHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -8)
-    itemHeader:SetPoint("TOPRIGHT", closeBtn, "TOPLEFT", -2, 0)
-    itemHeader:SetHeight(24)
+    itemHeader:SetSize(160, 24)
     frame.itemHeader = itemHeader
 
     local itemIcon = itemHeader:CreateTexture(nil, "ARTWORK")
@@ -584,6 +775,7 @@ function RollTrackerFrame:Init()
     frame.itemTitle = itemTitle
 
     itemHeader:SetScript("OnEnter", function(self)
+        if RollTrackerFrame.isDragging then return end
         local session = DataTracker:GetCurrentRollSession()
         if not session then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -602,11 +794,21 @@ function RollTrackerFrame:Init()
         GameTooltip:Hide()
     end)
     itemHeader:RegisterForDrag("LeftButton")
+    itemHeader:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StartDragging()
+        end
+    end)
+    itemHeader:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StopDragging()
+        end
+    end)
     itemHeader:SetScript("OnDragStart", function()
-        frame:GetScript("OnDragStart")(frame)
+        RollTrackerFrame:StartDragging()
     end)
     itemHeader:SetScript("OnDragStop", function()
-        frame:GetScript("OnDragStop")(frame)
+        RollTrackerFrame:StopDragging()
     end)
 
     -- Divider line below Item Header
@@ -615,6 +817,7 @@ function RollTrackerFrame:Init()
     headerDivider:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -34)
     headerDivider:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -34)
     headerDivider:SetColorTexture(0.6, 0.5, 0.3, 0.5)
+    frame.headerDivider = headerDivider
 
     -- Pure-Lua Container & ScrollBar for Player Rows (no FauxScrollFrameTemplate dependency)
     local rowContainer = CreateFrame("Frame", "ClearLootRollRowContainer", frame)
@@ -642,6 +845,7 @@ function RollTrackerFrame:Init()
     sbThumb:SetSize(8, 28)
     sbThumb:SetColorTexture(0.85, 0.75, 0.45, 0.75)
     scrollBar:SetThumbTexture(sbThumb)
+    frame.scrollBarThumb = sbThumb
 
     scrollBar:SetScript("OnValueChanged", function(self, value)
         if self._updating then return end
@@ -672,6 +876,7 @@ function RollTrackerFrame:Init()
     footerDivider:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 10, FOOTER_HEIGHT)
     footerDivider:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -10, FOOTER_HEIGHT)
     footerDivider:SetColorTexture(0.6, 0.5, 0.3, 0.4)
+    frame.footerDivider = footerDivider
 
     local footerText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     footerText:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 12, 8)
@@ -716,19 +921,123 @@ function RollTrackerFrame:Init()
     moverOverlay.lockBtn = lockBtn
 
     moverOverlay:SetScript("OnDragStart", function()
-        frame:GetScript("OnDragStart")(frame)
+        RollTrackerFrame:StartDragging()
     end)
     moverOverlay:SetScript("OnDragStop", function()
-        frame:GetScript("OnDragStop")(frame)
+        RollTrackerFrame:StopDragging()
     end)
     moverOverlay:Hide()
     frame.moverOverlay = moverOverlay
 
     frame:Hide()
     self.frame = frame
+    if _G.EllesmereUI and type(_G.EllesmereUI.RegisterSkin) == "function" then
+        pcall(_G.EllesmereUI.RegisterSkin, "ClearLoot", function(S)
+            RollTrackerFrame:SyncEllesmereTheme(S)
+            if type(S.OnLooksChanged) == "function" then
+                S.OnLooksChanged(function()
+                    RollTrackerFrame:SyncEllesmereTheme(S)
+                end)
+            end
+        end)
+    end
+    self:ApplyTheme()
     self:UpdateOpacity()
     self:UpdateScale()
     self:HookBlizzardEditMode()
+end
+
+function RollTrackerFrame:ApplyTheme()
+    local frame = self.frame
+    if not frame then return end
+    local themeKey = self:GetThemeKey()
+    local theme = self:GetTheme()
+
+    if theme.hasShadow then
+        if not frame.outerShadow then
+            local shadow = CreateFrame("Frame", nil, frame, BackdropTemplateMixin and "BackdropTemplate" or nil)
+            shadow:SetPoint("TOPLEFT", frame, "TOPLEFT", -3, 3)
+            shadow:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 3, -3)
+            shadow:SetFrameLevel(math.max(0, frame:GetFrameLevel() - 1))
+            if shadow.SetBackdrop then
+                shadow:SetBackdrop({
+                    bgFile = "Interface\\Buttons\\WHITE8X8",
+                    edgeFile = "Interface\\Buttons\\WHITE8X8",
+                    edgeSize = 3,
+                    insets = { left = 3, right = 3, top = 3, bottom = 3 },
+                })
+                shadow:SetBackdropColor(0, 0, 0, 0)
+                shadow:SetBackdropBorderColor(0, 0, 0, 0.45)
+            end
+            frame.outerShadow = shadow
+        end
+        frame.outerShadow:Show()
+    elseif frame.outerShadow then
+        frame.outerShadow:Hide()
+    end
+
+    if frame.SetBackdrop then
+        if self._appliedThemeKey ~= themeKey then
+            frame:SetBackdrop({
+                bgFile = theme.bgFile,
+                edgeFile = theme.edgeFile,
+                tile = theme.tile,
+                tileSize = theme.tileSize,
+                edgeSize = theme.edgeSize,
+                insets = theme.insets,
+            })
+        end
+        local bg = theme.bgColor
+        local bc = theme.borderColor
+        frame:SetBackdropColor(bg[1], bg[2], bg[3], bg[4] or 0.94)
+        frame:SetBackdropBorderColor(bc[1], bc[2], bc[3], bc[4] or 1.0)
+    end
+
+    if frame.headerDivider then
+        local dc = theme.dividerColor
+        frame.headerDivider:SetColorTexture(dc[1], dc[2], dc[3], dc[4] or 0.5)
+    end
+    if frame.footerDivider then
+        local dc = theme.dividerColor
+        frame.footerDivider:SetColorTexture(dc[1], dc[2], dc[3], (dc[4] or 0.5) * 0.85)
+    end
+    if frame.footerText then
+        local fc = theme.footerTextColor
+        frame.footerText:SetTextColor(fc[1], fc[2], fc[3])
+    end
+    if frame.scrollBarThumb then
+        local sc = theme.scrollThumbColor
+        frame.scrollBarThumb:SetColorTexture(sc[1], sc[2], sc[3], sc[4] or 0.8)
+    end
+    if frame.restartRollBtn and frame.restartRollBtn.SetBackdrop then
+        local bbg = theme.btnBgColor
+        local bbc = theme.btnBorderColor
+        frame.restartRollBtn:SetBackdropColor(bbg[1], bbg[2], bbg[3], bbg[4] or 0.9)
+        frame.restartRollBtn:SetBackdropBorderColor(bbc[1], bbc[2], bbc[3], bbc[4] or 0.9)
+    end
+
+    if frame.tabs then
+        local currentRollID = DataTracker and DataTracker.currentRollID
+        for i = 1, MAX_TABS do
+            local tab = frame.tabs[i]
+            if tab and tab.SetBackdrop then
+                if self._appliedThemeKey ~= themeKey then
+                    tab:SetBackdrop({
+                        bgFile = "Interface\\Buttons\\WHITE8X8",
+                        edgeFile = theme.tabEdgeFile,
+                        edgeSize = theme.tabEdgeSize,
+                        insets = theme.tabInsets,
+                    })
+                end
+                local tbg = theme.tabBgColor
+                tab:SetBackdropColor(tbg[1], tbg[2], tbg[3], tbg[4] or 0.9)
+                local tbc = (tab.rollID and tab.rollID == currentRollID) and theme.tabActiveBorder or theme.tabInactiveBorder
+                tab:SetBackdropBorderColor(tbc[1], tbc[2], tbc[3], tbc[4] or 1.0)
+            end
+        end
+    end
+
+    self._appliedThemeKey = themeKey
 end
 
 function RollTrackerFrame:UpdateOpacity()
@@ -736,15 +1045,23 @@ function RollTrackerFrame:UpdateOpacity()
     local pct = (ns.db and tonumber(ns.db.windowOpacity)) or 100
     if pct < 20 then pct = 20 end
     if pct > 100 then pct = 100 end
-    self.frame:SetAlpha(pct / 100)
+    local targetAlpha = pct / 100
+    if self._appliedAlpha ~= targetAlpha then
+        self._appliedAlpha = targetAlpha
+        self.frame:SetAlpha(targetAlpha)
+    end
 end
 
 function RollTrackerFrame:UpdateScale()
-    if not self.frame then return end
+    if not self.frame or self.isDragging then return end
     local pct = (ns.db and tonumber(ns.db.windowScale)) or 100
     if pct < 60 then pct = 60 end
     if pct > 160 then pct = 160 end
-    self.frame:SetScale(pct / 100)
+    local targetScale = pct / 100
+    if self._appliedScale ~= targetScale then
+        self._appliedScale = targetScale
+        self.frame:SetScale(targetScale)
+    end
 end
 
 function RollTrackerFrame:SetMoveMode(active, fromBlizzardEditMode)
@@ -859,19 +1176,22 @@ function RollTrackerFrame:UpdateTabs(activeRolls, currentRollID)
                 tab.badge:SetText("")
             end
 
+            local theme = self:GetTheme()
             if rollSession.rollID == currentRollID then
                 tab.activeGlow:Show()
                 tab.icon:SetDesaturated(false)
                 tab.icon:SetAlpha(1.0)
                 if tab.SetBackdropBorderColor then
-                    tab:SetBackdropBorderColor(1.0, 0.82, 0.0, 1.0)
+                    local ab = theme.tabActiveBorder
+                    tab:SetBackdropBorderColor(ab[1], ab[2], ab[3], ab[4] or 1.0)
                 end
             else
                 tab.activeGlow:Hide()
                 tab.icon:SetDesaturated(false)
                 tab.icon:SetAlpha(0.65)
                 if tab.SetBackdropBorderColor then
-                    tab:SetBackdropBorderColor(0.5, 0.5, 0.5, 0.8)
+                    local ib = theme.tabInactiveBorder
+                    tab:SetBackdropBorderColor(ib[1], ib[2], ib[3], ib[4] or 0.85)
                 end
             end
             tab:Show()
@@ -1063,6 +1383,12 @@ function RollTrackerFrame:Refresh(isNewRoll)
     local frame = self.frame
     if not frame then return end
 
+    if self.isDragging then
+        self._pendingRefresh = true
+        return
+    end
+
+    self:ApplyTheme()
     self:UpdateOpacity()
     self:UpdateScale()
     frame:SetWidth(self:GetWindowWidth())
@@ -1133,12 +1459,11 @@ function RollTrackerFrame:Refresh(isNewRoll)
             end
             frame.restartRollBtn:Show()
             frame.rollDiceBtn:Show()
-            frame.itemHeader:SetPoint("TOPRIGHT", frame.rollDiceBtn, "TOPLEFT", -4, 0)
         else
             frame.restartRollBtn:Hide()
             frame.rollDiceBtn:Hide()
-            frame.itemHeader:SetPoint("TOPRIGHT", frame.closeBtn, "TOPLEFT", -2, 0)
         end
+        self:UpdateHeaderHitRect()
     end
 
     -- Evaluate Player List & Leaders

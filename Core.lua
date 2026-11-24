@@ -18,6 +18,7 @@ local DEFAULT_SETTINGS = {
     keepOpenAfterMyRoll = true,
     hidePassed = false,
     hidePending = false,
+    theme = "FOREVER",       -- "FOREVER", "CLASSIC", "MINIMALIST", "ELLESMERE", or "FLARE"
     choiceDisplay = "ICONS", -- "ICONS", "TEXT", or "BOTH"
     autoCloseDelay = 5,      -- 3, 5, 10, 15 (seconds), or 0 (Never)
     trackRandomRolls = true, -- Track standard /roll (1-100) from group/raid members

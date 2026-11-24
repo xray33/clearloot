@@ -321,6 +321,34 @@ function SettingsModule:Init()
             ns.RollTrackerFrame:Refresh()
         end
     end)
+
+    local UpdateAnchorDisplay
+    local moveWinBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    moveWinBtn:SetSize(130, 24)
+    moveWinBtn:SetPoint("TOPLEFT", 290, y - 1)
+    moveWinBtn:SetText(L.SETTINGS_MOVE_BTN)
+    moveWinBtn:SetScript("OnClick", function()
+        if ns.RollTrackerFrame and ns.RollTrackerFrame.ToggleMoveMode then
+            ns.RollTrackerFrame:ToggleMoveMode()
+        end
+    end)
+
+    local resetPosBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    resetPosBtn:SetSize(130, 24)
+    resetPosBtn:SetPoint("LEFT", moveWinBtn, "RIGHT", 8, 0)
+    resetPosBtn:SetText(L.SETTINGS_RESET_POS_BTN)
+    resetPosBtn:SetScript("OnClick", function()
+        ns.db.freePosition = nil
+        ns.db.anchorSide = "RIGHT"
+        if UpdateAnchorDisplay then
+            UpdateAnchorDisplay("RIGHT")
+        end
+        if ns.MultiItemManager then
+            ns.MultiItemManager:UpdateAnchoring()
+        end
+        ns:Print(L.MSG_POS_RESET)
+    end)
+
     y = y - 34
 
     -- Row 1: Choice Column Display (Left) & Auto-Close Window (Right)
@@ -374,13 +402,13 @@ function SettingsModule:Init()
 
     y = y - 56
 
-    -- Row 2: Window Anchor Position (Left) + Move Window & Reset Position Buttons (Right)
+    -- Row 2: Window Anchor Position (Left) & Color Theme (Right)
     local ANCHOR_OPTIONS = {
         { value = "RIGHT", text = L.SETTINGS_ANCHOR_RIGHT },
         { value = "LEFT",  text = L.SETTINGS_ANCHOR_LEFT },
         { value = "FREE",  text = L.SETTINGS_ANCHOR_FREE },
     }
-    local _, UpdateAnchorDisplay = CreateDropdown(
+    _, UpdateAnchorDisplay = CreateDropdown(
         panel,
         "ClearLootAnchorDropDown",
         L.SETTINGS_ANCHOR_SIDE,
@@ -398,29 +426,30 @@ function SettingsModule:Init()
         end
     )
 
-    local moveWinBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    moveWinBtn:SetSize(130, 24)
-    moveWinBtn:SetPoint("TOPLEFT", 290, y - 18)
-    moveWinBtn:SetText(L.SETTINGS_MOVE_BTN)
-    moveWinBtn:SetScript("OnClick", function()
-        if ns.RollTrackerFrame and ns.RollTrackerFrame.ToggleMoveMode then
-            ns.RollTrackerFrame:ToggleMoveMode()
+    local THEME_OPTIONS = {
+        { value = "FOREVER",    text = L.SETTINGS_THEME_FOREVER or "Classic Forever (Bronze - Default)" },
+        { value = "CLASSIC",    text = L.SETTINGS_THEME_CLASSIC or "Classic" },
+        { value = "MINIMALIST", text = L.SETTINGS_THEME_MINIMALIST or "Minimalist (Flat Dark)" },
+        { value = "ELLESMERE",  text = L.SETTINGS_THEME_ELLESMERE or "EllesmereUI" },
+        { value = "FLARE",      text = L.SETTINGS_THEME_FLARE or "FlareUI" },
+    }
+    CreateDropdown(
+        panel,
+        "ClearLootThemeDropDown",
+        L.SETTINGS_THEME or "Color Theme",
+        L.SETTINGS_THEME_DESC,
+        290,
+        y,
+        210,
+        THEME_OPTIONS,
+        "theme",
+        "FOREVER",
+        function()
+            if ns.RollTrackerFrame and ns.RollTrackerFrame.ApplyTheme then
+                ns.RollTrackerFrame:ApplyTheme()
+            end
         end
-    end)
-
-    local resetPosBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    resetPosBtn:SetSize(130, 24)
-    resetPosBtn:SetPoint("LEFT", moveWinBtn, "RIGHT", 8, 0)
-    resetPosBtn:SetText(L.SETTINGS_RESET_POS_BTN)
-    resetPosBtn:SetScript("OnClick", function()
-        ns.db.freePosition = nil
-        ns.db.anchorSide = "RIGHT"
-        UpdateAnchorDisplay("RIGHT")
-        if ns.MultiItemManager then
-            ns.MultiItemManager:UpdateAnchoring()
-        end
-        ns:Print(L.MSG_POS_RESET)
-    end)
+    )
 
     y = y - 58
 

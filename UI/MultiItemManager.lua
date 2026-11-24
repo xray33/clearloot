@@ -27,8 +27,9 @@ local function GetAnyShownGroupLootFrame()
 end
 
 function MultiItemManager:UpdateAnchoring()
-    local tracker = ns.RollTrackerFrame and ns.RollTrackerFrame.frame
-    if not tracker then return end
+    local rtf = ns.RollTrackerFrame
+    local tracker = rtf and rtf.frame
+    if not tracker or (rtf and rtf.isDragging) then return end
 
     local side = ns.db and ns.db.anchorSide or "RIGHT"
 
