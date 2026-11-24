@@ -469,13 +469,31 @@ local function CreatePlayerRow(parent, index)
         end
     end)
 
+    row:RegisterForDrag("LeftButton")
+    row:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" and not IsShiftKeyDown() then
+            RollTrackerFrame:StartDragging()
+        end
+    end)
+    row:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StopDragging()
+        end
+    end)
+    row:SetScript("OnDragStart", function()
+        RollTrackerFrame:StartDragging()
+    end)
+    row:SetScript("OnDragStop", function()
+        RollTrackerFrame:StopDragging()
+    end)
+
     row:EnableMouseWheel(true)
     row:SetScript("OnMouseWheel", function(_, delta)
         RollTrackerFrame:OnMouseWheel(delta)
     end)
 
     row:SetScript("OnEnter", function(self)
-        if not self.playerData then return end
+        if RollTrackerFrame.isDragging or not self.playerData then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         local colored = ns.RosterInspector:ColorizeName(self.playerData.name, self.playerData.class)
         GameTooltip:SetText(colored)
@@ -512,6 +530,51 @@ function RollTrackerFrame:OnMouseWheel(delta)
     end
 end
 
+function RollTrackerFrame:StartDragging()
+    local frame = self.frame
+    if not frame or self.isDragging then return end
+    self.isDragging = true
+    GameTooltip:Hide()
+    frame:StartMoving()
+end
+
+function RollTrackerFrame:StopDragging()
+    local frame = self.frame
+    if not frame or not self.isDragging then return end
+    frame:StopMovingOrSizing()
+    self.isDragging = false
+    local point, _, relativePoint, x, y = frame:GetPoint(1)
+    if point then
+        ns.db.anchorSide = "FREE"
+        ns.db.freePosition = {
+            point = point,
+            relativePoint = relativePoint,
+            x = x,
+            y = y,
+        }
+    end
+    if self._pendingRefresh then
+        self._pendingRefresh = false
+        self:Refresh()
+    end
+end
+
+function RollTrackerFrame:UpdateHeaderHitRect()
+    local frame = self.frame
+    if not frame or not frame.itemHeader or not frame.itemTitle then return end
+
+    local winWidth = self:GetWindowWidth()
+    local rightReserved = (frame.rollDiceBtn and frame.rollDiceBtn:IsShown()) and 84 or 34
+    local maxHeaderWidth = math.max(60, winWidth - 10 - rightReserved)
+
+    local textWidth = frame.itemTitle:GetStringWidth() or 0
+    if textWidth <= 0 then
+        textWidth = maxHeaderWidth
+    end
+    local contentWidth = math.min(maxHeaderWidth, math.max(48, 20 + 6 + math.ceil(textWidth) + 4))
+    frame.itemHeader:SetWidth(contentWidth)
+end
+
 function RollTrackerFrame:Init()
     local frame = CreateFrame("Frame", "ClearLootTrackerFrame", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
     frame:SetSize(self:GetWindowWidth(), HEADER_HEIGHT + (MIN_VISIBLE_ROWS * ROW_HEIGHT) + FOOTER_HEIGHT)
@@ -529,21 +592,26 @@ function RollTrackerFrame:Init()
         RollTrackerFrame:OnMouseWheel(delta)
     end)
 
-    frame:SetScript("OnDragStart", function(self)
-        self:StartMoving()
+    frame:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StartDragging()
+        end
+    end)
+    frame:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StopDragging()
+        end
+    end)
+    frame:SetScript("OnDragStart", function()
+        RollTrackerFrame:StartDragging()
     end)
 
-    frame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local point, _, relativePoint, x, y = self:GetPoint(1)
-        if point then
-            ns.db.anchorSide = "FREE"
-            ns.db.freePosition = {
-                point = point,
-                relativePoint = relativePoint,
-                x = x,
-                y = y,
-            }
+    frame:SetScript("OnDragStop", function()
+        RollTrackerFrame:StopDragging()
+    end)
+    frame:SetScript("OnHide", function()
+        if RollTrackerFrame.isDragging then
+            RollTrackerFrame:StopDragging()
         end
     end)
 
@@ -687,11 +755,10 @@ function RollTrackerFrame:Init()
     rollDiceBtn:Hide()
     frame.rollDiceBtn = rollDiceBtn
 
-    -- Item Header Button (Icon + Item Link/Name, hoverable for item tooltip)
+    -- Item Header Button (Icon + Item Link/Name, sized tightly to icon + text for tooltip)
     local itemHeader = CreateFrame("Button", nil, frame)
     itemHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -8)
-    itemHeader:SetPoint("TOPRIGHT", closeBtn, "TOPLEFT", -2, 0)
-    itemHeader:SetHeight(24)
+    itemHeader:SetSize(160, 24)
     frame.itemHeader = itemHeader
 
     local itemIcon = itemHeader:CreateTexture(nil, "ARTWORK")
@@ -708,6 +775,7 @@ function RollTrackerFrame:Init()
     frame.itemTitle = itemTitle
 
     itemHeader:SetScript("OnEnter", function(self)
+        if RollTrackerFrame.isDragging then return end
         local session = DataTracker:GetCurrentRollSession()
         if not session then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -726,11 +794,21 @@ function RollTrackerFrame:Init()
         GameTooltip:Hide()
     end)
     itemHeader:RegisterForDrag("LeftButton")
+    itemHeader:SetScript("OnMouseDown", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StartDragging()
+        end
+    end)
+    itemHeader:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then
+            RollTrackerFrame:StopDragging()
+        end
+    end)
     itemHeader:SetScript("OnDragStart", function()
-        frame:GetScript("OnDragStart")(frame)
+        RollTrackerFrame:StartDragging()
     end)
     itemHeader:SetScript("OnDragStop", function()
-        frame:GetScript("OnDragStop")(frame)
+        RollTrackerFrame:StopDragging()
     end)
 
     -- Divider line below Item Header
@@ -843,10 +921,10 @@ function RollTrackerFrame:Init()
     moverOverlay.lockBtn = lockBtn
 
     moverOverlay:SetScript("OnDragStart", function()
-        frame:GetScript("OnDragStart")(frame)
+        RollTrackerFrame:StartDragging()
     end)
     moverOverlay:SetScript("OnDragStop", function()
-        frame:GetScript("OnDragStop")(frame)
+        RollTrackerFrame:StopDragging()
     end)
     moverOverlay:Hide()
     frame.moverOverlay = moverOverlay
@@ -967,15 +1045,23 @@ function RollTrackerFrame:UpdateOpacity()
     local pct = (ns.db and tonumber(ns.db.windowOpacity)) or 100
     if pct < 20 then pct = 20 end
     if pct > 100 then pct = 100 end
-    self.frame:SetAlpha(pct / 100)
+    local targetAlpha = pct / 100
+    if self._appliedAlpha ~= targetAlpha then
+        self._appliedAlpha = targetAlpha
+        self.frame:SetAlpha(targetAlpha)
+    end
 end
 
 function RollTrackerFrame:UpdateScale()
-    if not self.frame then return end
+    if not self.frame or self.isDragging then return end
     local pct = (ns.db and tonumber(ns.db.windowScale)) or 100
     if pct < 60 then pct = 60 end
     if pct > 160 then pct = 160 end
-    self.frame:SetScale(pct / 100)
+    local targetScale = pct / 100
+    if self._appliedScale ~= targetScale then
+        self._appliedScale = targetScale
+        self.frame:SetScale(targetScale)
+    end
 end
 
 function RollTrackerFrame:SetMoveMode(active, fromBlizzardEditMode)
@@ -1297,6 +1383,11 @@ function RollTrackerFrame:Refresh(isNewRoll)
     local frame = self.frame
     if not frame then return end
 
+    if self.isDragging then
+        self._pendingRefresh = true
+        return
+    end
+
     self:ApplyTheme()
     self:UpdateOpacity()
     self:UpdateScale()
@@ -1368,12 +1459,11 @@ function RollTrackerFrame:Refresh(isNewRoll)
             end
             frame.restartRollBtn:Show()
             frame.rollDiceBtn:Show()
-            frame.itemHeader:SetPoint("TOPRIGHT", frame.rollDiceBtn, "TOPLEFT", -4, 0)
         else
             frame.restartRollBtn:Hide()
             frame.rollDiceBtn:Hide()
-            frame.itemHeader:SetPoint("TOPRIGHT", frame.closeBtn, "TOPLEFT", -2, 0)
         end
+        self:UpdateHeaderHitRect()
     end
 
     -- Evaluate Player List & Leaders
